@@ -1,26 +1,28 @@
-use cosmwasm_schema::{cw_serde, QueryResponses};
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 
-#[cw_serde]
-pub struct InstantiateMsg {
-    pub count: i32,
-}
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct InstantiateMsg {}
 
-#[cw_serde]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub enum ExecuteMsg {
-    Increment {},
-    Reset { count: i32 },
+    PostJob { description: String },
+    SubmitProof { job_id: u64, proof: String },
+    AcceptProof { job_id: u64 },
 }
 
-#[cw_serde]
-#[derive(QueryResponses)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub enum QueryMsg {
-    // GetCount returns the current count as a json-encoded number
-    #[returns(GetCountResponse)]
-    GetCount {},
+    GetJob { job_id: u64 },
+    ListJobs {},
 }
 
-// We define a custom struct for each query response
-#[cw_serde]
-pub struct GetCountResponse {
-    pub count: i32,
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct JobResponse {
+    pub job: crate::state::Job,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct JobsResponse {
+    pub jobs: Vec<crate::state::Job>,
 }
