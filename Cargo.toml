@@ -1,5 +1,5 @@
 [package]
-name = "cw-counter"
+name = "proof-of-work-contract"
 version = "0.1.0"
 authors = ["Adrian Thompson"]
 edition = "2021"

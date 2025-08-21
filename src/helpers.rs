@@ -57,4 +57,36 @@ impl ProofOfWorkContract {
         let res: JobsResponse = QuerierWrapper::<CQ>::new(querier).query(&query)?;
         Ok(res)
     }
+
+    /// Query jobs by client
+    pub fn get_jobs_by_client<Q, CQ>(&self, querier: &Q, client: String) -> StdResult<JobsResponse>
+    where
+        Q: Querier,
+        CQ: CustomQuery,
+    {
+        let msg = QueryMsg::GetJobsByClient { client };
+        let query = WasmQuery::Smart {
+            contract_addr: self.addr().into(),
+            msg: to_json_binary(&msg)?,
+        }
+        .into();
+        let res: JobsResponse = QuerierWrapper::<CQ>::new(querier).query(&query)?;
+        Ok(res)
+    }
+
+    /// Query jobs by worker
+    pub fn get_jobs_by_worker<Q, CQ>(&self, querier: &Q, worker: String) -> StdResult<JobsResponse>
+    where
+        Q: Querier,
+        CQ: CustomQuery,
+    {
+        let msg = QueryMsg::GetJobsByWorker { worker };
+        let query = WasmQuery::Smart {
+            contract_addr: self.addr().into(),
+            msg: to_json_binary(&msg)?,
+        }
+        .into();
+        let res: JobsResponse = QuerierWrapper::<CQ>::new(querier).query(&query)?;
+        Ok(res)
+    }
 }

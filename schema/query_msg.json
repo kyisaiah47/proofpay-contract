@@ -1,0 +1,80 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "QueryMsg",
+  "oneOf": [
+    {
+      "type": "object",
+      "required": [
+        "get_job"
+      ],
+      "properties": {
+        "get_job": {
+          "type": "object",
+          "required": [
+            "job_id"
+          ],
+          "properties": {
+            "job_id": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "list_jobs"
+      ],
+      "properties": {
+        "list_jobs": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "get_jobs_by_client"
+      ],
+      "properties": {
+        "get_jobs_by_client": {
+          "type": "object",
+          "required": [
+            "client"
+          ],
+          "properties": {
+            "client": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "get_jobs_by_worker"
+      ],
+      "properties": {
+        "get_jobs_by_worker": {
+          "type": "object",
+          "required": [
+            "worker"
+          ],
+          "properties": {
+            "worker": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  ]
+}

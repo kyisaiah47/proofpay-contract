@@ -1,1 +1,1 @@
-fbb2e456d9856965f85aa77b67d8d76b9ac9dabe67a6f0aabfda746851535c28  cw_counter.wasm
+e8a6821b737bd3c897cf5e3969d02156f5cffdbb5ffdc68fe05e064316a515a0  cw_counter.wasm

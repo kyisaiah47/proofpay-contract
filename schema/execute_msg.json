@@ -1,0 +1,148 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ExecuteMsg",
+  "oneOf": [
+    {
+      "type": "object",
+      "required": [
+        "post_job"
+      ],
+      "properties": {
+        "post_job": {
+          "type": "object",
+          "required": [
+            "description"
+          ],
+          "properties": {
+            "deadline": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint64",
+              "minimum": 0.0
+            },
+            "description": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "accept_job"
+      ],
+      "properties": {
+        "accept_job": {
+          "type": "object",
+          "required": [
+            "job_id"
+          ],
+          "properties": {
+            "job_id": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "submit_proof"
+      ],
+      "properties": {
+        "submit_proof": {
+          "type": "object",
+          "required": [
+            "job_id",
+            "proof"
+          ],
+          "properties": {
+            "job_id": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
+            },
+            "proof": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "accept_proof"
+      ],
+      "properties": {
+        "accept_proof": {
+          "type": "object",
+          "required": [
+            "job_id"
+          ],
+          "properties": {
+            "job_id": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "reject_proof"
+      ],
+      "properties": {
+        "reject_proof": {
+          "type": "object",
+          "required": [
+            "job_id"
+          ],
+          "properties": {
+            "job_id": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "cancel_job"
+      ],
+      "properties": {
+        "cancel_job": {
+          "type": "object",
+          "required": [
+            "job_id"
+          ],
+          "properties": {
+            "job_id": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  ]
+}

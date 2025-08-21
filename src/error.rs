@@ -6,36 +6,33 @@ pub enum ContractError {
     #[error("{0}")]
     Std(#[from] StdError),
     
-    #[error("Unauthorized")]
-    Unauthorized {},
-    
-    #[error("NotFound")]
-    NotFound {},
+    #[error("Job not found")]
+    JobNotFound {},
     
     #[error("No payment attached")]
-    NoPaymentAttached,
+    NoPaymentAttached {},
     
     #[error("Invalid payment amount")]
-    InvalidPaymentAmount,
+    InvalidPaymentAmount {},
     
     #[error("Job not available")]
-    JobNotAvailable,
-    
-    #[error("Client cannot accept own job")]
-    ClientCannotAcceptOwnJob,
-    
-    #[error("Job not in progress")]
-    JobNotInProgress,
-    
-    #[error("No proof submitted")]
-    NoProofSubmitted,
-    
-    #[error("No worker assigned")]
-    NoWorkerAssigned,
-    
-    #[error("Job already completed")]
-    JobAlreadyCompleted,
+    JobNotAvailable {},
     
     #[error("Not authorized")]
-    NotAuthorized,
+    NotAuthorized {},
+    
+    #[error("Job not in progress")]
+    JobNotInProgress {},
+    
+    #[error("No proof submitted")]
+    NoProofSubmitted {},
+    
+    #[error("Client cannot accept own job")]
+    ClientCannotAcceptOwnJob {},
+    
+    #[error("Job already completed")]
+    JobAlreadyCompleted {},
+    
+    #[error("No worker assigned")]
+    NoWorkerAssigned {},
 }
