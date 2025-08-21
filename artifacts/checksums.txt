@@ -1,1 +1,1 @@
-e8a6821b737bd3c897cf5e3969d02156f5cffdbb5ffdc68fe05e064316a515a0  cw_counter.wasm
+c9814a05056f939fe7dfab2ed85a75747e57752d239ec28db80e47d89143d146  proof_of_work_contract.wasm
