@@ -5,16 +5,160 @@
     {
       "type": "object",
       "required": [
-        "get_job"
+        "get_user_by_username"
       ],
       "properties": {
-        "get_job": {
+        "get_user_by_username": {
           "type": "object",
           "required": [
-            "job_id"
+            "username"
           ],
           "properties": {
-            "job_id": {
+            "username": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "get_user_by_wallet"
+      ],
+      "properties": {
+        "get_user_by_wallet": {
+          "type": "object",
+          "required": [
+            "wallet_address"
+          ],
+          "properties": {
+            "wallet_address": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "is_username_available"
+      ],
+      "properties": {
+        "is_username_available": {
+          "type": "object",
+          "required": [
+            "username"
+          ],
+          "properties": {
+            "username": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "search_users"
+      ],
+      "properties": {
+        "search_users": {
+          "type": "object",
+          "required": [
+            "query"
+          ],
+          "properties": {
+            "query": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "get_user_friends"
+      ],
+      "properties": {
+        "get_user_friends": {
+          "type": "object",
+          "required": [
+            "username"
+          ],
+          "properties": {
+            "username": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "get_pending_requests"
+      ],
+      "properties": {
+        "get_pending_requests": {
+          "type": "object",
+          "required": [
+            "username"
+          ],
+          "properties": {
+            "username": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "are_friends"
+      ],
+      "properties": {
+        "are_friends": {
+          "type": "object",
+          "required": [
+            "username1",
+            "username2"
+          ],
+          "properties": {
+            "username1": {
+              "type": "string"
+            },
+            "username2": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "get_payment_by_id"
+      ],
+      "properties": {
+        "get_payment_by_id": {
+          "type": "object",
+          "required": [
+            "payment_id"
+          ],
+          "properties": {
+            "payment_id": {
               "type": "integer",
               "format": "uint64",
               "minimum": 0.0
@@ -27,28 +171,16 @@
     {
       "type": "object",
       "required": [
-        "list_jobs"
+        "get_payment_history"
       ],
       "properties": {
-        "list_jobs": {
-          "type": "object"
-        }
-      },
-      "additionalProperties": false
-    },
-    {
-      "type": "object",
-      "required": [
-        "get_jobs_by_client"
-      ],
-      "properties": {
-        "get_jobs_by_client": {
+        "get_payment_history": {
           "type": "object",
           "required": [
-            "client"
+            "username"
           ],
           "properties": {
-            "client": {
+            "username": {
               "type": "string"
             }
           }
@@ -59,16 +191,16 @@
     {
       "type": "object",
       "required": [
-        "get_jobs_by_worker"
+        "get_pending_payments"
       ],
       "properties": {
-        "get_jobs_by_worker": {
+        "get_pending_payments": {
           "type": "object",
           "required": [
-            "worker"
+            "username"
           ],
           "properties": {
-            "worker": {
+            "username": {
               "type": "string"
             }
           }

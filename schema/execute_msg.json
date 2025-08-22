@@ -5,24 +5,20 @@
     {
       "type": "object",
       "required": [
-        "post_job"
+        "register_user"
       ],
       "properties": {
-        "post_job": {
+        "register_user": {
           "type": "object",
           "required": [
-            "description"
+            "display_name",
+            "username"
           ],
           "properties": {
-            "deadline": {
-              "type": [
-                "integer",
-                "null"
-              ],
-              "format": "uint64",
-              "minimum": 0.0
+            "display_name": {
+              "type": "string"
             },
-            "description": {
+            "username": {
               "type": "string"
             }
           }
@@ -33,19 +29,199 @@
     {
       "type": "object",
       "required": [
-        "accept_job"
+        "update_user_profile"
       ],
       "properties": {
-        "accept_job": {
+        "update_user_profile": {
+          "type": "object",
+          "properties": {
+            "display_name": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "profile_picture": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "send_friend_request"
+      ],
+      "properties": {
+        "send_friend_request": {
           "type": "object",
           "required": [
-            "job_id"
+            "to_username"
           ],
           "properties": {
-            "job_id": {
-              "type": "integer",
-              "format": "uint64",
-              "minimum": 0.0
+            "to_username": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "accept_friend_request"
+      ],
+      "properties": {
+        "accept_friend_request": {
+          "type": "object",
+          "required": [
+            "from_username"
+          ],
+          "properties": {
+            "from_username": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "decline_friend_request"
+      ],
+      "properties": {
+        "decline_friend_request": {
+          "type": "object",
+          "required": [
+            "from_username"
+          ],
+          "properties": {
+            "from_username": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "remove_friend"
+      ],
+      "properties": {
+        "remove_friend": {
+          "type": "object",
+          "required": [
+            "username"
+          ],
+          "properties": {
+            "username": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "send_direct_payment"
+      ],
+      "properties": {
+        "send_direct_payment": {
+          "type": "object",
+          "required": [
+            "amount",
+            "description",
+            "proof_type",
+            "to_username"
+          ],
+          "properties": {
+            "amount": {
+              "$ref": "#/definitions/Coin"
+            },
+            "description": {
+              "type": "string"
+            },
+            "proof_type": {
+              "$ref": "#/definitions/ProofType"
+            },
+            "to_username": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "create_payment_request"
+      ],
+      "properties": {
+        "create_payment_request": {
+          "type": "object",
+          "required": [
+            "amount",
+            "description",
+            "proof_type",
+            "to_username"
+          ],
+          "properties": {
+            "amount": {
+              "$ref": "#/definitions/Coin"
+            },
+            "description": {
+              "type": "string"
+            },
+            "proof_type": {
+              "$ref": "#/definitions/ProofType"
+            },
+            "to_username": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "create_help_request"
+      ],
+      "properties": {
+        "create_help_request": {
+          "type": "object",
+          "required": [
+            "amount",
+            "description",
+            "proof_type",
+            "to_username"
+          ],
+          "properties": {
+            "amount": {
+              "$ref": "#/definitions/Coin"
+            },
+            "description": {
+              "type": "string"
+            },
+            "proof_type": {
+              "$ref": "#/definitions/ProofType"
+            },
+            "to_username": {
+              "type": "string"
             }
           }
         }
@@ -61,16 +237,16 @@
         "submit_proof": {
           "type": "object",
           "required": [
-            "job_id",
-            "proof"
+            "payment_id",
+            "proof_data"
           ],
           "properties": {
-            "job_id": {
+            "payment_id": {
               "type": "integer",
               "format": "uint64",
               "minimum": 0.0
             },
-            "proof": {
+            "proof_data": {
               "type": "string"
             }
           }
@@ -81,16 +257,16 @@
     {
       "type": "object",
       "required": [
-        "accept_proof"
+        "approve_payment"
       ],
       "properties": {
-        "accept_proof": {
+        "approve_payment": {
           "type": "object",
           "required": [
-            "job_id"
+            "payment_id"
           ],
           "properties": {
-            "job_id": {
+            "payment_id": {
               "type": "integer",
               "format": "uint64",
               "minimum": 0.0
@@ -103,16 +279,16 @@
     {
       "type": "object",
       "required": [
-        "reject_proof"
+        "reject_payment"
       ],
       "properties": {
-        "reject_proof": {
+        "reject_payment": {
           "type": "object",
           "required": [
-            "job_id"
+            "payment_id"
           ],
           "properties": {
-            "job_id": {
+            "payment_id": {
               "type": "integer",
               "format": "uint64",
               "minimum": 0.0
@@ -125,16 +301,16 @@
     {
       "type": "object",
       "required": [
-        "cancel_job"
+        "cancel_payment"
       ],
       "properties": {
-        "cancel_job": {
+        "cancel_payment": {
           "type": "object",
           "required": [
-            "job_id"
+            "payment_id"
           ],
           "properties": {
-            "job_id": {
+            "payment_id": {
               "type": "integer",
               "format": "uint64",
               "minimum": 0.0
@@ -144,5 +320,37 @@
       },
       "additionalProperties": false
     }
-  ]
+  ],
+  "definitions": {
+    "Coin": {
+      "type": "object",
+      "required": [
+        "amount",
+        "denom"
+      ],
+      "properties": {
+        "amount": {
+          "$ref": "#/definitions/Uint128"
+        },
+        "denom": {
+          "type": "string"
+        }
+      }
+    },
+    "ProofType": {
+      "type": "string",
+      "enum": [
+        "None",
+        "Photo",
+        "Document",
+        "Location",
+        "ZkTLS",
+        "Manual"
+      ]
+    },
+    "Uint128": {
+      "description": "A thin wrapper around u128 that is using strings for JSON encoding/decoding, such that the full u128 range can be used for clients that convert JSON numbers to floats, like JavaScript and jq.\n\n# Examples\n\nUse `from` to create instances of this and `u128` to get the value out:\n\n``` # use cosmwasm_std::Uint128; let a = Uint128::from(123u128); assert_eq!(a.u128(), 123);\n\nlet b = Uint128::from(42u64); assert_eq!(b.u128(), 42);\n\nlet c = Uint128::from(70u32); assert_eq!(c.u128(), 70); ```",
+      "type": "string"
+    }
+  }
 }

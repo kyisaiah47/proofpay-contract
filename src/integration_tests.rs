@@ -1,8 +1,8 @@
 #[cfg(test)]
 mod tests {
-    use crate::helpers::ProofOfWorkContract;
+    use crate::helpers::SocialPaymentContract;
     use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
-    use crate::state::JobStatus;
+    use crate::state::{PaymentStatus, ProofType};
     use cosmwasm_std::{Addr, Coin, Empty, Uint128};
     use cw_multi_test::{App, AppBuilder, Contract, ContractWrapper, Executor};
 
@@ -15,39 +15,31 @@ mod tests {
         Box::new(contract)
     }
 
-    const CLIENT: &str = "client1";
-    const WORKER: &str = "worker1";
+    const USER1: &str = "user1";
+    const USER2: &str = "user2";
+    const USER3: &str = "user3";
     const ADMIN: &str = "admin";
     const NATIVE_DENOM: &str = "uxion";
 
     fn mock_app() -> App {
         AppBuilder::new().build(|router, _, storage| {
-            router
-                .bank
-                .init_balance(
-                    storage,
-                    &Addr::unchecked(CLIENT),
-                    vec![Coin {
-                        denom: NATIVE_DENOM.to_string(),
-                        amount: Uint128::new(1000),
-                    }],
-                )
-                .unwrap();
-            router
-                .bank
-                .init_balance(
-                    storage,
-                    &Addr::unchecked(WORKER),
-                    vec![Coin {
-                        denom: NATIVE_DENOM.to_string(),
-                        amount: Uint128::new(100),
-                    }],
-                )
-                .unwrap();
+            for user in [USER1, USER2, USER3] {
+                router
+                    .bank
+                    .init_balance(
+                        storage,
+                        &Addr::unchecked(user),
+                        vec![Coin {
+                            denom: NATIVE_DENOM.to_string(),
+                            amount: Uint128::new(10000),
+                        }],
+                    )
+                    .unwrap();
+            }
         })
     }
 
-    fn proper_instantiate() -> (App, ProofOfWorkContract) {
+    fn proper_instantiate() -> (App, SocialPaymentContract) {
         let mut app = mock_app();
         let contract_id = app.store_code(contract_template());
 
@@ -58,196 +50,451 @@ mod tests {
                 Addr::unchecked(ADMIN),
                 &msg,
                 &[],
-                "proof-of-work",
+                "social-payment",
                 None,
             )
             .unwrap();
 
-        let contract = ProofOfWorkContract(contract_addr);
+        let contract = SocialPaymentContract(contract_addr);
 
         (app, contract)
     }
 
-    mod job_lifecycle {
+    fn register_users(app: &mut App, contract: &SocialPaymentContract) {
+        // Register users
+        let register_user1 = ExecuteMsg::RegisterUser {
+            username: "alice".to_string(),
+            display_name: "Alice Smith".to_string(),
+        };
+        app.execute_contract(Addr::unchecked(USER1), contract.addr(), &register_user1, &[])
+            .unwrap();
+
+        let register_user2 = ExecuteMsg::RegisterUser {
+            username: "bob".to_string(),
+            display_name: "Bob Jones".to_string(),
+        };
+        app.execute_contract(Addr::unchecked(USER2), contract.addr(), &register_user2, &[])
+            .unwrap();
+
+        let register_user3 = ExecuteMsg::RegisterUser {
+            username: "charlie".to_string(),
+            display_name: "Charlie Brown".to_string(),
+        };
+        app.execute_contract(Addr::unchecked(USER3), contract.addr(), &register_user3, &[])
+            .unwrap();
+    }
+
+    mod user_management {
         use super::*;
 
         #[test]
-        fn test_post_job() {
+        fn test_user_registration() {
             let (mut app, contract) = proper_instantiate();
 
-            // Post a job with payment
-            let payment = vec![Coin {
-                denom: NATIVE_DENOM.to_string(),
-                amount: Uint128::new(100),
-            }];
-
-            let msg = ExecuteMsg::PostJob {
-                description: "Test job description".to_string(),
-                deadline: None,
+            // Register a user
+            let msg = ExecuteMsg::RegisterUser {
+                username: "alice".to_string(),
+                display_name: "Alice Smith".to_string(),
             };
 
-            app.execute_contract(
-                Addr::unchecked(CLIENT),
-                contract.addr(),
-                &msg,
-                &payment,
-            )
-            .unwrap();
-
-            // Query the job
-            let job_response: crate::msg::JobResponse = app
-                .wrap()
-                .query_wasm_smart(contract.addr(), &QueryMsg::GetJob { job_id: 1 })
+            app.execute_contract(Addr::unchecked(USER1), contract.addr(), &msg, &[])
                 .unwrap();
 
-            assert_eq!(job_response.job.id, 1);
-            assert_eq!(job_response.job.client, Addr::unchecked(CLIENT));
-            assert_eq!(job_response.job.description, "Test job description");
-            assert_eq!(job_response.job.status, JobStatus::Open);
-            assert_eq!(job_response.job.escrow_amount.amount, Uint128::new(100));
+            // Query the user
+            let user_response: crate::msg::UserResponse = app
+                .wrap()
+                .query_wasm_smart(
+                    contract.addr(),
+                    &QueryMsg::GetUserByUsername {
+                        username: "alice".to_string(),
+                    },
+                )
+                .unwrap();
+
+            assert_eq!(user_response.user.username, "alice");
+            assert_eq!(user_response.user.display_name, "Alice Smith");
+            assert_eq!(user_response.user.wallet_address, Addr::unchecked(USER1));
         }
 
         #[test]
-        fn test_accept_job() {
+        fn test_username_availability() {
             let (mut app, contract) = proper_instantiate();
 
-            // Post a job
-            let payment = vec![Coin {
-                denom: NATIVE_DENOM.to_string(),
-                amount: Uint128::new(100),
-            }];
-
-            let post_msg = ExecuteMsg::PostJob {
-                description: "Test job".to_string(),
-                deadline: None,
-            };
-
-            app.execute_contract(
-                Addr::unchecked(CLIENT),
-                contract.addr(),
-                &post_msg,
-                &payment,
-            )
-            .unwrap();
-
-            // Worker accepts the job
-            let accept_msg = ExecuteMsg::AcceptJob { job_id: 1 };
-
-            app.execute_contract(Addr::unchecked(WORKER), contract.addr(), &accept_msg, &[])
-                .unwrap();
-
-            // Query the job
-            let job_response: crate::msg::JobResponse = app
+            // Check username availability before registration
+            let available_response: crate::msg::UsernameAvailableResponse = app
                 .wrap()
-                .query_wasm_smart(contract.addr(), &QueryMsg::GetJob { job_id: 1 })
+                .query_wasm_smart(
+                    contract.addr(),
+                    &QueryMsg::IsUsernameAvailable {
+                        username: "alice".to_string(),
+                    },
+                )
+                .unwrap();
+            assert!(available_response.available);
+
+            // Register user
+            let msg = ExecuteMsg::RegisterUser {
+                username: "alice".to_string(),
+                display_name: "Alice Smith".to_string(),
+            };
+            app.execute_contract(Addr::unchecked(USER1), contract.addr(), &msg, &[])
                 .unwrap();
 
-            assert_eq!(job_response.job.status, JobStatus::InProgress);
-            assert_eq!(job_response.job.worker, Some(Addr::unchecked(WORKER)));
+            // Check username availability after registration
+            let available_response: crate::msg::UsernameAvailableResponse = app
+                .wrap()
+                .query_wasm_smart(
+                    contract.addr(),
+                    &QueryMsg::IsUsernameAvailable {
+                        username: "alice".to_string(),
+                    },
+                )
+                .unwrap();
+            assert!(!available_response.available);
         }
 
         #[test]
-        fn test_submit_and_accept_proof() {
+        fn test_search_users() {
             let (mut app, contract) = proper_instantiate();
+            register_users(&mut app, &contract);
 
-            // Post a job
-            let payment = vec![Coin {
-                denom: NATIVE_DENOM.to_string(),
-                amount: Uint128::new(100),
-            }];
-
-            let post_msg = ExecuteMsg::PostJob {
-                description: "Test job".to_string(),
-                deadline: None,
-            };
-
-            app.execute_contract(
-                Addr::unchecked(CLIENT),
-                contract.addr(),
-                &post_msg,
-                &payment,
-            )
-            .unwrap();
-
-            // Worker accepts the job
-            let accept_msg = ExecuteMsg::AcceptJob { job_id: 1 };
-            app.execute_contract(Addr::unchecked(WORKER), contract.addr(), &accept_msg, &[])
+            // Search for users
+            let search_response: crate::msg::UsersResponse = app
+                .wrap()
+                .query_wasm_smart(
+                    contract.addr(),
+                    &QueryMsg::SearchUsers {
+                        query: "alice".to_string(),
+                    },
+                )
                 .unwrap();
 
-            // Worker submits proof
-            let submit_msg = ExecuteMsg::SubmitProof {
-                job_id: 1,
-                proof: "Proof of work completed".to_string(),
-            };
-            app.execute_contract(Addr::unchecked(WORKER), contract.addr(), &submit_msg, &[])
-                .unwrap();
+            assert_eq!(search_response.users.len(), 1);
+            assert_eq!(search_response.users[0].username, "alice");
+        }
+    }
 
-            // Client accepts proof
-            let accept_proof_msg = ExecuteMsg::AcceptProof { job_id: 1 };
+    mod friends_system {
+        use super::*;
+
+        #[test]
+        fn test_friend_request_lifecycle() {
+            let (mut app, contract) = proper_instantiate();
+            register_users(&mut app, &contract);
+
+            // Send friend request
+            let send_request = ExecuteMsg::SendFriendRequest {
+                to_username: "bob".to_string(),
+            };
             app.execute_contract(
-                Addr::unchecked(CLIENT),
+                Addr::unchecked(USER1),
                 contract.addr(),
-                &accept_proof_msg,
+                &send_request,
                 &[],
             )
             .unwrap();
 
-            // Query the job
-            let job_response: crate::msg::JobResponse = app
+            // Check pending requests for bob
+            let pending_response: crate::msg::FriendRequestsResponse = app
                 .wrap()
-                .query_wasm_smart(contract.addr(), &QueryMsg::GetJob { job_id: 1 })
+                .query_wasm_smart(
+                    contract.addr(),
+                    &QueryMsg::GetPendingRequests {
+                        username: "bob".to_string(),
+                    },
+                )
                 .unwrap();
+            assert_eq!(pending_response.requests.len(), 1);
+            assert_eq!(pending_response.requests[0].from_username, "alice");
 
-            assert_eq!(job_response.job.status, JobStatus::Completed);
-            assert_eq!(
-                job_response.job.proof,
-                Some("Proof of work completed".to_string())
-            );
+            // Accept friend request
+            let accept_request = ExecuteMsg::AcceptFriendRequest {
+                from_username: "alice".to_string(),
+            };
+            app.execute_contract(
+                Addr::unchecked(USER2),
+                contract.addr(),
+                &accept_request,
+                &[],
+            )
+            .unwrap();
 
-            // Check that worker received payment
-            let worker_balance = app.wrap().query_balance(WORKER, NATIVE_DENOM).unwrap();
-            assert_eq!(worker_balance.amount, Uint128::new(200)); // 100 initial + 100 payment
+            // Check if they are friends
+            let friends_response: crate::msg::AreFriendsResponse = app
+                .wrap()
+                .query_wasm_smart(
+                    contract.addr(),
+                    &QueryMsg::AreFriends {
+                        username1: "alice".to_string(),
+                        username2: "bob".to_string(),
+                    },
+                )
+                .unwrap();
+            assert!(friends_response.are_friends);
+
+            // Check alice's friends list
+            let friends_list: crate::msg::FriendsResponse = app
+                .wrap()
+                .query_wasm_smart(
+                    contract.addr(),
+                    &QueryMsg::GetUserFriends {
+                        username: "alice".to_string(),
+                    },
+                )
+                .unwrap();
+            assert_eq!(friends_list.friends.len(), 1);
+            assert_eq!(friends_list.friends[0], "bob");
         }
 
         #[test]
-        fn test_cancel_job() {
+        fn test_remove_friend() {
             let (mut app, contract) = proper_instantiate();
+            register_users(&mut app, &contract);
 
-            // Post a job
-            let payment = vec![Coin {
+            // Become friends first
+            let send_request = ExecuteMsg::SendFriendRequest {
+                to_username: "bob".to_string(),
+            };
+            app.execute_contract(
+                Addr::unchecked(USER1),
+                contract.addr(),
+                &send_request,
+                &[],
+            )
+            .unwrap();
+
+            let accept_request = ExecuteMsg::AcceptFriendRequest {
+                from_username: "alice".to_string(),
+            };
+            app.execute_contract(
+                Addr::unchecked(USER2),
+                contract.addr(),
+                &accept_request,
+                &[],
+            )
+            .unwrap();
+
+            // Remove friend
+            let remove_friend = ExecuteMsg::RemoveFriend {
+                username: "bob".to_string(),
+            };
+            app.execute_contract(
+                Addr::unchecked(USER1),
+                contract.addr(),
+                &remove_friend,
+                &[],
+            )
+            .unwrap();
+
+            // Check if they are no longer friends
+            let friends_response: crate::msg::AreFriendsResponse = app
+                .wrap()
+                .query_wasm_smart(
+                    contract.addr(),
+                    &QueryMsg::AreFriends {
+                        username1: "alice".to_string(),
+                        username2: "bob".to_string(),
+                    },
+                )
+                .unwrap();
+            assert!(!friends_response.are_friends);
+        }
+    }
+
+    mod payment_system {
+        use super::*;
+
+        #[test]
+        fn test_direct_payment_no_proof() {
+            let (mut app, contract) = proper_instantiate();
+            register_users(&mut app, &contract);
+
+            let payment_amount = vec![Coin {
                 denom: NATIVE_DENOM.to_string(),
                 amount: Uint128::new(100),
             }];
 
-            let post_msg = ExecuteMsg::PostJob {
-                description: "Test job".to_string(),
-                deadline: None,
+            // Send direct payment with no proof required
+            let send_payment = ExecuteMsg::SendDirectPayment {
+                to_username: "bob".to_string(),
+                amount: payment_amount[0].clone(),
+                description: "Test payment".to_string(),
+                proof_type: ProofType::None,
             };
 
             app.execute_contract(
-                Addr::unchecked(CLIENT),
+                Addr::unchecked(USER1),
                 contract.addr(),
-                &post_msg,
-                &payment,
+                &send_payment,
+                &payment_amount,
             )
             .unwrap();
 
-            // Client cancels the job
-            let cancel_msg = ExecuteMsg::CancelJob { job_id: 1 };
-            app.execute_contract(Addr::unchecked(CLIENT), contract.addr(), &cancel_msg, &[])
-                .unwrap();
+            // Check bob's balance increased
+            let bob_balance = app.wrap().query_balance(USER2, NATIVE_DENOM).unwrap();
+            assert_eq!(bob_balance.amount, Uint128::new(10100)); // 10000 initial + 100 payment
 
-            // Query the job
-            let job_response: crate::msg::JobResponse = app
+            // Check payment was created and completed
+            let payment_response: crate::msg::PaymentResponse = app
                 .wrap()
-                .query_wasm_smart(contract.addr(), &QueryMsg::GetJob { job_id: 1 })
+                .query_wasm_smart(contract.addr(), &QueryMsg::GetPaymentById { payment_id: 1 })
                 .unwrap();
 
-            assert_eq!(job_response.job.status, JobStatus::Cancelled);
+            assert_eq!(payment_response.payment.from_username, "alice");
+            assert_eq!(payment_response.payment.to_username, "bob");
+            assert_eq!(payment_response.payment.status, PaymentStatus::Completed);
+        }
 
-            // Check that client received refund
-            let client_balance = app.wrap().query_balance(CLIENT, NATIVE_DENOM).unwrap();
-            assert_eq!(client_balance.amount, Uint128::new(1000)); // Full refund
+        #[test]
+        fn test_help_request_with_proof() {
+            let (mut app, contract) = proper_instantiate();
+            register_users(&mut app, &contract);
+
+            let payment_amount = vec![Coin {
+                denom: NATIVE_DENOM.to_string(),
+                amount: Uint128::new(200),
+            }];
+
+            // Create help request with photo proof required
+            let help_request = ExecuteMsg::CreateHelpRequest {
+                to_username: "bob".to_string(),
+                amount: payment_amount[0].clone(),
+                description: "Help with moving".to_string(),
+                proof_type: ProofType::Photo,
+            };
+
+            app.execute_contract(
+                Addr::unchecked(USER1),
+                contract.addr(),
+                &help_request,
+                &payment_amount,
+            )
+            .unwrap();
+
+            // Submit proof
+            let submit_proof = ExecuteMsg::SubmitProof {
+                payment_id: 1,
+                proof_data: "photo_hash_12345".to_string(),
+            };
+            app.execute_contract(
+                Addr::unchecked(USER2),
+                contract.addr(),
+                &submit_proof,
+                &[],
+            )
+            .unwrap();
+
+            // Approve payment
+            let approve_payment = ExecuteMsg::ApprovePayment { payment_id: 1 };
+            app.execute_contract(
+                Addr::unchecked(USER1),
+                contract.addr(),
+                &approve_payment,
+                &[],
+            )
+            .unwrap();
+
+            // Check bob received payment
+            let bob_balance = app.wrap().query_balance(USER2, NATIVE_DENOM).unwrap();
+            assert_eq!(bob_balance.amount, Uint128::new(10200)); // 10000 initial + 200 payment
+
+            // Check payment status
+            let payment_response: crate::msg::PaymentResponse = app
+                .wrap()
+                .query_wasm_smart(contract.addr(), &QueryMsg::GetPaymentById { payment_id: 1 })
+                .unwrap();
+            assert_eq!(payment_response.payment.status, PaymentStatus::Completed);
+        }
+
+        #[test]
+        fn test_payment_cancellation() {
+            let (mut app, contract) = proper_instantiate();
+            register_users(&mut app, &contract);
+
+            let payment_amount = vec![Coin {
+                denom: NATIVE_DENOM.to_string(),
+                amount: Uint128::new(150),
+            }];
+
+            // Create help request
+            let help_request = ExecuteMsg::CreateHelpRequest {
+                to_username: "bob".to_string(),
+                amount: payment_amount[0].clone(),
+                description: "Help with coding".to_string(),
+                proof_type: ProofType::Manual,
+            };
+
+            app.execute_contract(
+                Addr::unchecked(USER1),
+                contract.addr(),
+                &help_request,
+                &payment_amount,
+            )
+            .unwrap();
+
+            // Cancel payment
+            let cancel_payment = ExecuteMsg::CancelPayment { payment_id: 1 };
+            app.execute_contract(
+                Addr::unchecked(USER1),
+                contract.addr(),
+                &cancel_payment,
+                &[],
+            )
+            .unwrap();
+
+            // Check alice got refund
+            let alice_balance = app.wrap().query_balance(USER1, NATIVE_DENOM).unwrap();
+            assert_eq!(alice_balance.amount, Uint128::new(10000)); // Full refund
+
+            // Check payment status
+            let payment_response: crate::msg::PaymentResponse = app
+                .wrap()
+                .query_wasm_smart(contract.addr(), &QueryMsg::GetPaymentById { payment_id: 1 })
+                .unwrap();
+            assert_eq!(payment_response.payment.status, PaymentStatus::Cancelled);
+        }
+
+        #[test]
+        fn test_payment_history() {
+            let (mut app, contract) = proper_instantiate();
+            register_users(&mut app, &contract);
+
+            let payment_amount = vec![Coin {
+                denom: NATIVE_DENOM.to_string(),
+                amount: Uint128::new(50),
+            }];
+
+            // Send multiple payments
+            for i in 0..3 {
+                let send_payment = ExecuteMsg::SendDirectPayment {
+                    to_username: "bob".to_string(),
+                    amount: payment_amount[0].clone(),
+                    description: format!("Payment {}", i + 1),
+                    proof_type: ProofType::None,
+                };
+
+                app.execute_contract(
+                    Addr::unchecked(USER1),
+                    contract.addr(),
+                    &send_payment,
+                    &payment_amount,
+                )
+                .unwrap();
+            }
+
+            // Check alice's payment history
+            let history_response: crate::msg::PaymentsResponse = app
+                .wrap()
+                .query_wasm_smart(
+                    contract.addr(),
+                    &QueryMsg::GetPaymentHistory {
+                        username: "alice".to_string(),
+                    },
+                )
+                .unwrap();
+
+            assert_eq!(history_response.payments.len(), 3);
+            assert_eq!(history_response.payments[0].from_username, "alice");
         }
     }
 
@@ -255,57 +502,103 @@ mod tests {
         use super::*;
 
         #[test]
-        fn test_client_cannot_accept_own_job() {
+        fn test_duplicate_username_registration() {
             let (mut app, contract) = proper_instantiate();
 
-            // Post a job
-            let payment = vec![Coin {
-                denom: NATIVE_DENOM.to_string(),
-                amount: Uint128::new(100),
-            }];
-
-            let post_msg = ExecuteMsg::PostJob {
-                description: "Test job".to_string(),
-                deadline: None,
+            // Register first user
+            let register_user = ExecuteMsg::RegisterUser {
+                username: "alice".to_string(),
+                display_name: "Alice Smith".to_string(),
             };
+            app.execute_contract(Addr::unchecked(USER1), contract.addr(), &register_user, &[])
+                .unwrap();
 
-            app.execute_contract(
-                Addr::unchecked(CLIENT),
-                contract.addr(),
-                &post_msg,
-                &payment,
-            )
-            .unwrap();
-
-            // Client tries to accept their own job (should fail)
-            let accept_msg = ExecuteMsg::AcceptJob { job_id: 1 };
+            // Try to register with same username (should fail)
+            let register_duplicate = ExecuteMsg::RegisterUser {
+                username: "alice".to_string(),
+                display_name: "Alice Jones".to_string(),
+            };
             let result = app.execute_contract(
-                Addr::unchecked(CLIENT),
+                Addr::unchecked(USER2),
                 contract.addr(),
-                &accept_msg,
+                &register_duplicate,
                 &[],
             );
-
             assert!(result.is_err());
         }
 
         #[test]
-        fn test_post_job_without_payment_fails() {
+        fn test_send_friend_request_to_self() {
             let (mut app, contract) = proper_instantiate();
+            register_users(&mut app, &contract);
 
-            // Try to post a job without payment (should fail)
-            let post_msg = ExecuteMsg::PostJob {
-                description: "Test job".to_string(),
-                deadline: None,
+            // Try to send friend request to self (should fail)
+            let send_request = ExecuteMsg::SendFriendRequest {
+                to_username: "alice".to_string(),
+            };
+            let result = app.execute_contract(
+                Addr::unchecked(USER1),
+                contract.addr(),
+                &send_request,
+                &[],
+            );
+            assert!(result.is_err());
+        }
+
+        #[test]
+        fn test_payment_to_self() {
+            let (mut app, contract) = proper_instantiate();
+            register_users(&mut app, &contract);
+
+            let payment_amount = vec![Coin {
+                denom: NATIVE_DENOM.to_string(),
+                amount: Uint128::new(100),
+            }];
+
+            // Try to pay self (should fail)
+            let send_payment = ExecuteMsg::SendDirectPayment {
+                to_username: "alice".to_string(),
+                amount: payment_amount[0].clone(),
+                description: "Self payment".to_string(),
+                proof_type: ProofType::None,
             };
 
             let result = app.execute_contract(
-                Addr::unchecked(CLIENT),
+                Addr::unchecked(USER1),
                 contract.addr(),
-                &post_msg,
-                &[],
+                &send_payment,
+                &payment_amount,
             );
+            assert!(result.is_err());
+        }
 
+        #[test]
+        fn test_insufficient_funds() {
+            let (mut app, contract) = proper_instantiate();
+            register_users(&mut app, &contract);
+
+            let payment_amount = vec![Coin {
+                denom: NATIVE_DENOM.to_string(),
+                amount: Uint128::new(50),
+            }];
+
+            // Try to send more than provided (should fail)
+            let send_payment = ExecuteMsg::SendDirectPayment {
+                to_username: "bob".to_string(),
+                amount: Coin {
+                    denom: NATIVE_DENOM.to_string(),
+                    amount: Uint128::new(100), // Request 100 but only send 50
+                },
+                description: "Insufficient funds test".to_string(),
+                proof_type: ProofType::None,
+            };
+
+            let result = app.execute_contract(
+                Addr::unchecked(USER1),
+                contract.addr(),
+                &send_payment,
+                &payment_amount,
+            );
             assert!(result.is_err());
         }
     }

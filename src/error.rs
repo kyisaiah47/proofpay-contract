@@ -6,33 +6,82 @@ pub enum ContractError {
     #[error("{0}")]
     Std(#[from] StdError),
     
-    #[error("Job not found")]
-    JobNotFound {},
+    // User Management Errors
+    #[error("Username already taken")]
+    UsernameAlreadyTaken {},
     
-    #[error("No payment attached")]
-    NoPaymentAttached {},
+    #[error("User not found")]
+    UserNotFound {},
+    
+    #[error("Invalid username format")]
+    InvalidUsername {},
+    
+    #[error("Wallet already registered")]
+    WalletAlreadyRegistered {},
+    
+    #[error("User not registered")]
+    UserNotRegistered {},
+    
+    // Friends System Errors
+    #[error("Cannot send friend request to yourself")]
+    CannotAddSelf {},
+    
+    #[error("Friend request already exists")]
+    FriendRequestAlreadyExists {},
+    
+    #[error("Friend request not found")]
+    FriendRequestNotFound {},
+    
+    #[error("Users are already friends")]
+    AlreadyFriends {},
+    
+    #[error("Users are not friends")]
+    NotFriends {},
+    
+    #[error("Cannot send friend request to non-friend")]
+    CannotRequestNonFriend {},
+    
+    // Payment System Errors
+    #[error("Payment not found")]
+    PaymentNotFound {},
+    
+    #[error("Not authorized to access this payment")]
+    PaymentNotAuthorized {},
+    
+    #[error("Payment already completed")]
+    PaymentAlreadyCompleted {},
+    
+    #[error("Payment already cancelled")]
+    PaymentAlreadyCancelled {},
+    
+    #[error("Cannot send payment to yourself")]
+    CannotPaySelf {},
+    
+    #[error("Insufficient funds")]
+    InsufficientFunds {},
     
     #[error("Invalid payment amount")]
     InvalidPaymentAmount {},
     
-    #[error("Job not available")]
-    JobNotAvailable {},
+    #[error("Proof already submitted")]
+    ProofAlreadySubmitted {},
     
+    #[error("No proof required for this payment")]
+    NoProofRequired {},
+    
+    #[error("Proof required before approval")]
+    ProofRequired {},
+    
+    #[error("Invalid proof type")]
+    InvalidProofType {},
+    
+    // Authorization Errors
     #[error("Not authorized")]
     NotAuthorized {},
     
-    #[error("Job not in progress")]
-    JobNotInProgress {},
+    #[error("Only payment sender can cancel")]
+    OnlySenderCanCancel {},
     
-    #[error("No proof submitted")]
-    NoProofSubmitted {},
-    
-    #[error("Client cannot accept own job")]
-    ClientCannotAcceptOwnJob {},
-    
-    #[error("Job already completed")]
-    JobAlreadyCompleted {},
-    
-    #[error("No worker assigned")]
-    NoWorkerAssigned {},
+    #[error("Only payment recipient can approve")]
+    OnlyRecipientCanApprove {},
 }

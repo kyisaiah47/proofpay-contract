@@ -1,18 +1,38 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "State",
+  "title": "User",
   "type": "object",
   "required": [
-    "next_payment_id",
-    "owner"
+    "created_at",
+    "display_name",
+    "updated_at",
+    "username",
+    "wallet_address"
   ],
   "properties": {
-    "next_payment_id": {
+    "created_at": {
       "type": "integer",
       "format": "uint64",
       "minimum": 0.0
     },
-    "owner": {
+    "display_name": {
+      "type": "string"
+    },
+    "profile_picture": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "updated_at": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0
+    },
+    "username": {
+      "type": "string"
+    },
+    "wallet_address": {
       "$ref": "#/definitions/Addr"
     }
   },

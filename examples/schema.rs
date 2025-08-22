@@ -1,6 +1,6 @@
 use cosmwasm_schema::{export_schema, remove_schemas, schema_for};
-use proof_of_work_contract::msg::{ExecuteMsg, InstantiateMsg, QueryMsg, JobResponse, JobsResponse};
-use proof_of_work_contract::state::{Job, JobStatus, State};
+use proof_of_work_contract::msg::{ExecuteMsg, InstantiateMsg, QueryMsg, UserResponse, UsersResponse, PaymentResponse, PaymentsResponse};
+use proof_of_work_contract::state::{User, Payment, PaymentStatus, ProofType, State};
 use std::env::current_dir;
 use std::fs::create_dir_all;
 
@@ -13,9 +13,13 @@ fn main() {
     export_schema(&schema_for!(InstantiateMsg), &out_dir);
     export_schema(&schema_for!(ExecuteMsg), &out_dir);
     export_schema(&schema_for!(QueryMsg), &out_dir);
-    export_schema(&schema_for!(JobResponse), &out_dir);
-    export_schema(&schema_for!(JobsResponse), &out_dir);
-    export_schema(&schema_for!(Job), &out_dir);
-    export_schema(&schema_for!(JobStatus), &out_dir);
+    export_schema(&schema_for!(UserResponse), &out_dir);
+    export_schema(&schema_for!(UsersResponse), &out_dir);
+    export_schema(&schema_for!(PaymentResponse), &out_dir);
+    export_schema(&schema_for!(PaymentsResponse), &out_dir);
+    export_schema(&schema_for!(User), &out_dir);
+    export_schema(&schema_for!(Payment), &out_dir);
+    export_schema(&schema_for!(PaymentStatus), &out_dir);
+    export_schema(&schema_for!(ProofType), &out_dir);
     export_schema(&schema_for!(State), &out_dir);
 }
