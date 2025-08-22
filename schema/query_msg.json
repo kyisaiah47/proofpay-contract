@@ -85,6 +85,66 @@
     {
       "type": "object",
       "required": [
+        "get_username_by_wallet"
+      ],
+      "properties": {
+        "get_username_by_wallet": {
+          "type": "object",
+          "required": [
+            "wallet_address"
+          ],
+          "properties": {
+            "wallet_address": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "get_wallet_by_username"
+      ],
+      "properties": {
+        "get_wallet_by_username": {
+          "type": "object",
+          "required": [
+            "username"
+          ],
+          "properties": {
+            "username": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "has_username"
+      ],
+      "properties": {
+        "has_username": {
+          "type": "object",
+          "required": [
+            "wallet_address"
+          ],
+          "properties": {
+            "wallet_address": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
         "get_user_friends"
       ],
       "properties": {

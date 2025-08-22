@@ -89,15 +89,26 @@ pub fn execute(
 
 // Helper function to validate username format
 fn validate_username(username: &str) -> Result<(), ContractError> {
-    if username.len() < 3 || username.len() > 20 {
+    // Check length: 3-50 characters as requested
+    if username.is_empty() {
         return Err(ContractError::InvalidUsername {});
     }
     
+    if username.len() < 3 || username.len() > 50 {
+        return Err(ContractError::InvalidUsername {});
+    }
+    
+    // Check characters: alphanumeric + underscores only
     if !username.chars().all(|c| c.is_alphanumeric() || c == '_') {
         return Err(ContractError::InvalidUsername {});
     }
     
     Ok(())
+}
+
+// Helper function to normalize username (convert to lowercase for case-insensitive checking)
+fn normalize_username(username: &str) -> String {
+    username.to_lowercase()
 }
 
 // Helper function to get username from wallet address
@@ -118,8 +129,11 @@ pub fn execute_register_user(
     // Validate username format
     validate_username(&username)?;
     
-    // Check if username is already taken
-    if USERS_BY_USERNAME.may_load(deps.storage, username.clone())?.is_some() {
+    // Normalize username for case-insensitive checking
+    let normalized_username = normalize_username(&username);
+    
+    // Check if username is already taken (case-insensitive)
+    if USERS_BY_USERNAME.may_load(deps.storage, normalized_username.clone())?.is_some() {
         return Err(ContractError::UsernameAlreadyTaken {});
     }
     
@@ -130,21 +144,26 @@ pub fn execute_register_user(
     
     let user = User {
         wallet_address: info.sender.clone(),
-        username: username.clone(),
+        username: normalized_username.clone(),
         display_name,
         profile_picture: None,
         created_at: env.block.time.seconds(),
         updated_at: env.block.time.seconds(),
     };
     
-    // Save user data
-    USERS_BY_USERNAME.save(deps.storage, username.clone(), &user)?;
-    USERS_BY_WALLET.save(deps.storage, info.sender.clone(), &username)?;
+    // Save user data using normalized username
+    USERS_BY_USERNAME.save(deps.storage, normalized_username.clone(), &user)?;
+    USERS_BY_WALLET.save(deps.storage, info.sender.clone(), &normalized_username)?;
     
     Ok(Response::new()
         .add_attribute("action", "register_user")
-        .add_attribute("username", username)
-        .add_attribute("wallet", info.sender.as_str()))
+        .add_attribute("username", &normalized_username)
+        .add_attribute("wallet", info.sender.as_str())
+        .add_event(
+            cosmwasm_std::Event::new("username_registered")
+                .add_attribute("wallet", info.sender.as_str())
+                .add_attribute("username", &normalized_username)
+        ))
 }
 
 pub fn execute_update_user_profile(
@@ -186,20 +205,21 @@ pub fn execute_send_friend_request(
     to_username: String,
 ) -> Result<Response, ContractError> {
     let from_username = get_username_from_wallet(&deps, &info.sender)?;
+    let normalized_to_username = normalize_username(&to_username);
     
     // Check if trying to add self
-    if from_username == to_username {
+    if from_username == normalized_to_username {
         return Err(ContractError::CannotAddSelf {});
     }
     
     // Check if target user exists
-    if USERS_BY_USERNAME.may_load(deps.storage, to_username.clone())?.is_none() {
+    if USERS_BY_USERNAME.may_load(deps.storage, normalized_to_username.clone())?.is_none() {
         return Err(ContractError::UserNotFound {});
     }
     
     // Check if already friends
-    let friendship_key1 = (from_username.clone(), to_username.clone());
-    let friendship_key2 = (to_username.clone(), from_username.clone());
+    let friendship_key1 = (from_username.clone(), normalized_to_username.clone());
+    let friendship_key2 = (normalized_to_username.clone(), from_username.clone());
     
     if FRIENDSHIPS.may_load(deps.storage, friendship_key1)?.is_some() ||
        FRIENDSHIPS.may_load(deps.storage, friendship_key2)?.is_some() {
@@ -207,14 +227,14 @@ pub fn execute_send_friend_request(
     }
     
     // Check if friend request already exists
-    let request_key = (from_username.clone(), to_username.clone());
+    let request_key = (from_username.clone(), normalized_to_username.clone());
     if FRIEND_REQUESTS.may_load(deps.storage, request_key.clone())?.is_some() {
         return Err(ContractError::FriendRequestAlreadyExists {});
     }
     
     let friend_request = FriendRequest {
         from_username: from_username.clone(),
-        to_username: to_username.clone(),
+        to_username: normalized_to_username.clone(),
         status: FriendRequestStatus::Pending,
         created_at: env.block.time.seconds(),
         updated_at: env.block.time.seconds(),
@@ -224,8 +244,8 @@ pub fn execute_send_friend_request(
     
     Ok(Response::new()
         .add_attribute("action", "send_friend_request")
-        .add_attribute("from", from_username)
-        .add_attribute("to", to_username))
+        .add_attribute("from_username", from_username)
+        .add_attribute("to_username", normalized_to_username))
 }
 
 pub fn execute_accept_friend_request(
@@ -711,6 +731,11 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::IsUsernameAvailable { username } => query_username_available(deps, username),
         QueryMsg::SearchUsers { query } => query_search_users(deps, query),
         
+        // New username-specific queries
+        QueryMsg::GetUsernameByWallet { wallet_address } => query_username_by_wallet(deps, wallet_address),
+        QueryMsg::GetWalletByUsername { username } => query_wallet_by_username(deps, username),
+        QueryMsg::HasUsername { wallet_address } => query_has_username(deps, wallet_address),
+        
         // Friends System
         QueryMsg::GetUserFriends { username } => query_user_friends(deps, username),
         QueryMsg::GetPendingRequests { username } => query_pending_requests(deps, username),
@@ -726,7 +751,8 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
 // USER MANAGEMENT QUERIES
 
 fn query_user_by_username(deps: Deps, username: String) -> StdResult<Binary> {
-    let user = USERS_BY_USERNAME.load(deps.storage, username)?;
+    let normalized_username = normalize_username(&username);
+    let user = USERS_BY_USERNAME.load(deps.storage, normalized_username)?;
     to_json_binary(&UserResponse { user })
 }
 
@@ -738,8 +764,34 @@ fn query_user_by_wallet(deps: Deps, wallet_address: String) -> StdResult<Binary>
 }
 
 fn query_username_available(deps: Deps, username: String) -> StdResult<Binary> {
-    let available = USERS_BY_USERNAME.may_load(deps.storage, username)?.is_none();
+    // Validate username format first
+    if let Err(_) = validate_username(&username) {
+        // If username format is invalid, consider it not available
+        return to_json_binary(&UsernameAvailableResponse { available: false });
+    }
+    
+    let normalized_username = normalize_username(&username);
+    let available = USERS_BY_USERNAME.may_load(deps.storage, normalized_username)?.is_none();
     to_json_binary(&UsernameAvailableResponse { available })
+}
+
+// New username-specific query functions
+fn query_username_by_wallet(deps: Deps, wallet_address: String) -> StdResult<Binary> {
+    let wallet_addr = deps.api.addr_validate(&wallet_address)?;
+    let username = USERS_BY_WALLET.load(deps.storage, wallet_addr)?;
+    to_json_binary(&UsernameResponse { username })
+}
+
+fn query_wallet_by_username(deps: Deps, username: String) -> StdResult<Binary> {
+    let normalized_username = normalize_username(&username);
+    let user = USERS_BY_USERNAME.load(deps.storage, normalized_username)?;
+    to_json_binary(&WalletResponse { wallet_address: user.wallet_address.to_string() })
+}
+
+fn query_has_username(deps: Deps, wallet_address: String) -> StdResult<Binary> {
+    let wallet_addr = deps.api.addr_validate(&wallet_address)?;
+    let has_username = USERS_BY_WALLET.may_load(deps.storage, wallet_addr)?.is_some();
+    to_json_binary(&HasUsernameResponse { has_username })
 }
 
 fn query_search_users(deps: Deps, query: String) -> StdResult<Binary> {

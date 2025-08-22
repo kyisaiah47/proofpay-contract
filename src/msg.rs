@@ -85,6 +85,17 @@ pub enum QueryMsg {
         query: String 
     },
     
+    // New username-specific queries
+    GetUsernameByWallet { 
+        wallet_address: String 
+    },
+    GetWalletByUsername { 
+        username: String 
+    },
+    HasUsername { 
+        wallet_address: String 
+    },
+    
     // Friends System
     GetUserFriends { 
         username: String 
@@ -123,6 +134,21 @@ pub struct UsersResponse {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct UsernameAvailableResponse {
     pub available: bool,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct UsernameResponse {
+    pub username: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct WalletResponse {
+    pub wallet_address: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct HasUsernameResponse {
+    pub has_username: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

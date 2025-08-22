@@ -602,4 +602,172 @@ mod tests {
             assert!(result.is_err());
         }
     }
+
+    mod username_management {
+        use super::*;
+        use crate::msg::{UsernameResponse, WalletResponse, HasUsernameResponse, UsernameAvailableResponse};
+
+        #[test]
+        fn test_case_insensitive_username_registration() {
+            let (mut app, contract) = proper_instantiate();
+
+            // Register user with uppercase username
+            let register_msg = ExecuteMsg::RegisterUser {
+                username: "ALICE".to_string(),
+                display_name: "Alice Smith".to_string(),
+            };
+            app.execute_contract(Addr::unchecked(USER1), contract.addr(), &register_msg, &[])
+                .unwrap();
+
+            // Try to register with same username in lowercase (should fail)
+            let register_msg_lower = ExecuteMsg::RegisterUser {
+                username: "alice".to_string(),
+                display_name: "Alice Johnson".to_string(),
+            };
+            let result = app.execute_contract(Addr::unchecked(USER2), contract.addr(), &register_msg_lower, &[]);
+            assert!(result.is_err());
+
+            // Query with different case should work
+            let query_msg = QueryMsg::GetUserByUsername {
+                username: "alice".to_string(),
+            };
+            let _result: crate::msg::UserResponse = app
+                .wrap()
+                .query_wasm_smart(contract.addr(), &query_msg)
+                .unwrap();
+        }
+
+        #[test]
+        fn test_username_validation() {
+            let (mut app, contract) = proper_instantiate();
+
+            // Test username too short
+            let register_msg = ExecuteMsg::RegisterUser {
+                username: "ab".to_string(),
+                display_name: "Alice Smith".to_string(),
+            };
+            let result = app.execute_contract(Addr::unchecked(USER1), contract.addr(), &register_msg, &[]);
+            assert!(result.is_err());
+
+            // Test username too long (over 50 characters)
+            let register_msg = ExecuteMsg::RegisterUser {
+                username: "a".repeat(51),
+                display_name: "Alice Smith".to_string(),
+            };
+            let result = app.execute_contract(Addr::unchecked(USER1), contract.addr(), &register_msg, &[]);
+            assert!(result.is_err());
+
+            // Test invalid characters
+            let register_msg = ExecuteMsg::RegisterUser {
+                username: "alice@test".to_string(),
+                display_name: "Alice Smith".to_string(),
+            };
+            let result = app.execute_contract(Addr::unchecked(USER1), contract.addr(), &register_msg, &[]);
+            assert!(result.is_err());
+
+            // Test valid username with underscores
+            let register_msg = ExecuteMsg::RegisterUser {
+                username: "alice_123".to_string(),
+                display_name: "Alice Smith".to_string(),
+            };
+            app.execute_contract(Addr::unchecked(USER1), contract.addr(), &register_msg, &[])
+                .unwrap();
+        }
+
+        #[test]
+        fn test_new_username_queries() {
+            let (mut app, contract) = proper_instantiate();
+
+            // Register user
+            let register_msg = ExecuteMsg::RegisterUser {
+                username: "alice".to_string(),
+                display_name: "Alice Smith".to_string(),
+            };
+            app.execute_contract(Addr::unchecked(USER1), contract.addr(), &register_msg, &[])
+                .unwrap();
+
+            // Test GetUsernameByWallet
+            let query_msg = QueryMsg::GetUsernameByWallet {
+                wallet_address: USER1.to_string(),
+            };
+            let result: UsernameResponse = app
+                .wrap()
+                .query_wasm_smart(contract.addr(), &query_msg)
+                .unwrap();
+            assert_eq!(result.username, "alice");
+
+            // Test GetWalletByUsername
+            let query_msg = QueryMsg::GetWalletByUsername {
+                username: "alice".to_string(),
+            };
+            let result: WalletResponse = app
+                .wrap()
+                .query_wasm_smart(contract.addr(), &query_msg)
+                .unwrap();
+            assert_eq!(result.wallet_address, USER1);
+
+            // Test HasUsername for registered user
+            let query_msg = QueryMsg::HasUsername {
+                wallet_address: USER1.to_string(),
+            };
+            let result: HasUsernameResponse = app
+                .wrap()
+                .query_wasm_smart(contract.addr(), &query_msg)
+                .unwrap();
+            assert!(result.has_username);
+
+            // Test HasUsername for unregistered user
+            let query_msg = QueryMsg::HasUsername {
+                wallet_address: USER2.to_string(),
+            };
+            let result: HasUsernameResponse = app
+                .wrap()
+                .query_wasm_smart(contract.addr(), &query_msg)
+                .unwrap();
+            assert!(!result.has_username);
+        }
+
+        #[test]
+        fn test_username_availability_validation() {
+            let (mut app, contract) = proper_instantiate();
+
+            // Test invalid username format - should return false for availability
+            let query_msg = QueryMsg::IsUsernameAvailable {
+                username: "ab".to_string(), // Too short
+            };
+            let result: UsernameAvailableResponse = app
+                .wrap()
+                .query_wasm_smart(contract.addr(), &query_msg)
+                .unwrap();
+            assert!(!result.available);
+
+            // Test valid but available username
+            let query_msg = QueryMsg::IsUsernameAvailable {
+                username: "alice".to_string(),
+            };
+            let result: UsernameAvailableResponse = app
+                .wrap()
+                .query_wasm_smart(contract.addr(), &query_msg)
+                .unwrap();
+            assert!(result.available);
+
+            // Register user
+            let register_msg = ExecuteMsg::RegisterUser {
+                username: "alice".to_string(),
+                display_name: "Alice Smith".to_string(),
+            };
+            app.execute_contract(Addr::unchecked(USER1), contract.addr(), &register_msg, &[])
+                .unwrap();
+
+            // Test taken username (case insensitive)
+            let query_msg = QueryMsg::IsUsernameAvailable {
+                username: "ALICE".to_string(),
+            };
+            let result: UsernameAvailableResponse = app
+                .wrap()
+                .query_wasm_smart(contract.addr(), &query_msg)
+                .unwrap();
+            assert!(!result.available);
+        }
+    }
 }
