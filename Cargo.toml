@@ -1,7 +1,7 @@
 [package]
-name = "proof-of-work-contract"
+name = "proofpay-contract"
 version = "0.1.0"
-authors = ["Adrian Thompson"]
+authors = ["Isaiah Kim"]
 edition = "2021"
 
 exclude = [
@@ -39,6 +39,7 @@ optimize = """docker run --rm -v "$(pwd)":/code \
 """
 
 [dependencies]
+
 cosmwasm-schema = "1.3.1"
 cosmwasm-std = "1.3.1"
 cosmwasm-storage = "1.3.1"
@@ -47,6 +48,7 @@ cw2 = "1.1.0"
 schemars = "0.8.12"
 serde = { version = "1.0.183", default-features = false, features = ["derive"] }
 thiserror = "1.0.44"
+base64ct = "=1.6.0"
 
 [dev-dependencies]
 cw-multi-test = "0.17.0"
