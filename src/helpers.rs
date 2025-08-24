@@ -6,6 +6,7 @@ use cosmwasm_std::{
 };
 
 use crate::msg::{ExecuteMsg, QueryMsg, UserResponse, UsersResponse, FriendsResponse, PaymentResponse, PaymentsResponse};
+use crate::error::ContractError;
 
 /// SocialPaymentContract is a wrapper around Addr that provides helpers for your contract.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
@@ -121,4 +122,32 @@ impl SocialPaymentContract {
         let res: PaymentsResponse = QuerierWrapper::<CQ>::new(querier).query(&query)?;
         Ok(res)
     }
+}
+
+/// zkTLS verification interface - stubbed for now
+pub fn verify_zktls(proof_blob: &str, endpoint: &str) -> Result<bool, ContractError> {
+    // TODO: Replace with actual zkTLS verification logic
+    // For now, this is a stub that can be easily swapped out
+    
+    // Basic validation checks
+    if proof_blob.is_empty() || endpoint.is_empty() {
+        return Err(ContractError::InvalidProof {});
+    }
+    
+    // Stub implementation - in production, this would:
+    // 1. Parse the zkTLS proof
+    // 2. Verify the proof cryptographically
+    // 3. Check that the proof corresponds to the expected endpoint
+    // 4. Validate the proof's timestamp and other metadata
+    
+    // For testing/development, we'll consider proofs valid if they contain "valid"
+    let is_valid = proof_blob.contains("valid") || proof_blob.len() > 10;
+    
+    Ok(is_valid)
+}
+
+/// Hash a piece of data for on-chain storage
+pub fn hash_data(data: &str) -> String {
+    // Simple hash for now - in production use proper cryptographic hash
+    format!("hash_{}", data.len())
 }

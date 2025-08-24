@@ -22,6 +22,7 @@ pub fn instantiate(
     let state = State {
         owner: info.sender.clone(),
         next_payment_id: 1,
+        next_task_id: 1,
     };
     
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
@@ -69,8 +70,30 @@ pub fn execute(
         ExecuteMsg::CreatePaymentRequest { to_username, amount, description, proof_type } => {
             execute_create_payment_request(deps, env, info, to_username, amount, description, proof_type)
         }
-        ExecuteMsg::CreateHelpRequest { to_username, amount, description, proof_type } => {
-            execute_create_help_request(deps, env, info, to_username, amount, description, proof_type)
+        // Task System
+        ExecuteMsg::CreateTask { to_username, amount, description, proof_type, deadline_ts, review_window_secs, endpoint } => {
+            execute_create_task(deps, env, info, to_username, amount, description, proof_type, deadline_ts, review_window_secs, endpoint)
+        }
+        ExecuteMsg::SubmitSoftEvidence { task_id, evidence_hash } => {
+            execute_submit_soft_evidence(deps, env, info, task_id, evidence_hash)
+        }
+        ExecuteMsg::SubmitZkTlsProof { task_id, proof_blob_or_ref, zk_proof_hash } => {
+            execute_submit_zktls_proof(deps, env, info, task_id, proof_blob_or_ref, zk_proof_hash)
+        }
+        ExecuteMsg::ApproveTask { task_id } => {
+            execute_approve_task(deps, env, info, task_id)
+        }
+        ExecuteMsg::DisputeTask { task_id, reason_hash } => {
+            execute_dispute_task(deps, env, info, task_id, reason_hash)
+        }
+        ExecuteMsg::ResolveDispute { task_id, decision } => {
+            execute_resolve_dispute(deps, env, info, task_id, decision)
+        }
+        ExecuteMsg::RefundIfExpired { task_id } => {
+            execute_refund_if_expired(deps, env, info, task_id)
+        }
+        ExecuteMsg::ReleaseIfWindowElapsed { task_id } => {
+            execute_release_if_window_elapsed(deps, env, info, task_id)
         }
         ExecuteMsg::SubmitProof { payment_id, proof_data } => {
             execute_submit_proof(deps, env, info, payment_id, proof_data)
@@ -510,7 +533,7 @@ pub fn execute_create_help_request(
         to_username: to_username.clone(),
         amount,
         description,
-        payment_type: PaymentType::HelpRequest,
+        payment_type: PaymentType::PaymentRequest, // Changed from HelpRequest to PaymentRequest
         proof_type,
         proof_data: None,
         status: PaymentStatus::Pending,
@@ -584,8 +607,7 @@ pub fn execute_approve_payment(
     // Check authorization based on payment type
     let authorized = match payment.payment_type {
         PaymentType::DirectPayment => payment.from_username == username,
-        PaymentType::PaymentRequest => payment.to_username == username,
-        PaymentType::HelpRequest => payment.from_username == username,
+        PaymentType::PaymentRequest => payment.to_username == username, // PaymentRequest: receiver approves
     };
     
     if !authorized {
@@ -612,19 +634,44 @@ pub fn execute_approve_payment(
         Ok(payment)
     })?;
     
-    let recipient = USERS_BY_USERNAME.load(deps.storage, payment.to_username.clone())?;
-    
-    // Send payment to recipient
-    let payment_msg = CosmosMsg::Bank(BankMsg::Send {
-        to_address: recipient.wallet_address.to_string(),
-        amount: vec![payment.amount],
-    });
-    
-    Ok(Response::new()
-        .add_message(payment_msg)
+    let mut response = Response::new()
         .add_attribute("action", "approve_payment")
         .add_attribute("payment_id", payment_id.to_string())
-        .add_attribute("approver", username))
+        .add_attribute("approver", username);
+    
+    // Handle payment based on type
+    match payment.payment_type {
+        PaymentType::DirectPayment => {
+            // Direct payment funds already held in contract, send to recipient
+            let recipient = USERS_BY_USERNAME.load(deps.storage, payment.to_username.clone())?;
+            let payment_msg = CosmosMsg::Bank(BankMsg::Send {
+                to_address: recipient.wallet_address.to_string(),
+                amount: vec![payment.amount],
+            });
+            response = response.add_message(payment_msg);
+        },
+        PaymentType::PaymentRequest => {
+            // Payment request: approver (to_username) should send funds to requester (from_username)
+            // Check if sufficient funds were sent by approver
+            let sent_amount = info.funds.iter()
+                .find(|coin| coin.denom == payment.amount.denom)
+                .map(|coin| coin.amount)
+                .unwrap_or_default();
+            
+            if sent_amount < payment.amount.amount {
+                return Err(ContractError::InsufficientFunds {});
+            }
+            
+            let requester = USERS_BY_USERNAME.load(deps.storage, payment.from_username.clone())?;
+            let payment_msg = CosmosMsg::Bank(BankMsg::Send {
+                to_address: requester.wallet_address.to_string(),
+                amount: vec![payment.amount],
+            });
+            response = response.add_message(payment_msg);
+        }
+    }
+    
+    Ok(response)
 }
 
 pub fn execute_reject_payment(
@@ -641,8 +688,7 @@ pub fn execute_reject_payment(
     // Check authorization based on payment type
     let authorized = match payment.payment_type {
         PaymentType::DirectPayment => payment.from_username == username,
-        PaymentType::PaymentRequest => payment.to_username == username,
-        PaymentType::HelpRequest => payment.from_username == username,
+        PaymentType::PaymentRequest => payment.to_username == username, // PaymentRequest: receiver approves
     };
     
     if !authorized {
@@ -711,7 +757,7 @@ pub fn execute_cancel_payment(
         .add_attribute("payment_id", payment_id.to_string())
         .add_attribute("canceller", username);
     
-    if matches!(payment.payment_type, PaymentType::HelpRequest) {
+    if matches!(payment.payment_type, PaymentType::PaymentRequest) {
         let refund_msg = CosmosMsg::Bank(BankMsg::Send {
             to_address: sender.wallet_address.to_string(),
             amount: vec![payment.amount],
@@ -745,6 +791,11 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::GetPaymentById { payment_id } => query_payment_by_id(deps, payment_id),
         QueryMsg::GetPaymentHistory { username } => query_payment_history(deps, username),
         QueryMsg::GetPendingPayments { username } => query_pending_payments(deps, username),
+        
+        // Task System
+        QueryMsg::GetTaskById { task_id } => query_task_by_id(deps, task_id),
+        QueryMsg::GetTaskHistory { username } => query_task_history(deps, username),
+        QueryMsg::GetPendingTasks { username } => query_pending_tasks(deps, username),
     }
 }
 
@@ -878,4 +929,566 @@ fn query_pending_payments(deps: Deps, username: String) -> StdResult<Binary> {
     }
     
     to_json_binary(&PaymentsResponse { payments })
+}
+
+// TASK SYSTEM FUNCTIONS
+
+use crate::state::{Task, TaskStatus, TASKS, USER_TASKS};
+use crate::helpers::verify_zktls;
+
+pub fn execute_create_task(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    to_username: String,
+    amount: cosmwasm_std::Coin,
+    description: String,
+    proof_type: ProofType,
+    deadline_ts: u64,
+    review_window_secs: Option<u64>,
+    endpoint: String,
+) -> Result<Response, ContractError> {
+    let from_username = get_username_from_wallet(&deps, &info.sender)?;
+    
+    // Validate task creation
+    if from_username == to_username {
+        return Err(ContractError::CannotCreateTaskWithSelf {});
+    }
+    
+    // Check if worker exists
+    if USERS_BY_USERNAME.may_load(deps.storage, to_username.clone())?.is_none() {
+        return Err(ContractError::UserNotFound {});
+    }
+    
+    // Validate deadline
+    if deadline_ts <= env.block.time.seconds() {
+        return Err(ContractError::InvalidTaskDeadline {});
+    }
+    
+    // Validate payment amount
+    if amount.amount.is_zero() {
+        return Err(ContractError::InvalidPaymentAmount {});
+    }
+    
+    // For non-soft tasks, require escrow funds
+    if !matches!(proof_type, ProofType::Soft) {
+        let sent_amount = info.funds.iter()
+            .find(|coin| coin.denom == amount.denom)
+            .map(|coin| coin.amount)
+            .unwrap_or_default();
+        
+        if sent_amount < amount.amount {
+            return Err(ContractError::InsufficientFunds {});
+        }
+    }
+    
+    let mut state = STATE.load(deps.storage)?;
+    let task_id = state.next_task_id;
+    state.next_task_id += 1;
+    STATE.save(deps.storage, &state)?;
+    
+    let task = Task {
+        id: task_id,
+        payer: from_username.clone(),
+        worker: to_username.clone(),
+        amount,
+        proof_type: proof_type.clone(),
+        status: if matches!(proof_type, ProofType::Soft) {
+            TaskStatus::ProofSubmitted // Soft tasks don't escrow, so they start ready for approval
+        } else {
+            TaskStatus::Escrowed
+        },
+        deadline_ts,
+        review_window_secs,
+        endpoint,
+        evidence_hash: None,
+        zk_proof_hash: None,
+        verified_at: None,
+        verifier_id: None,
+        description,
+        created_at: env.block.time.seconds(),
+        updated_at: env.block.time.seconds(),
+    };
+    
+    TASKS.save(deps.storage, task_id, &task)?;
+    USER_TASKS.save(deps.storage, (from_username.clone(), task_id), &true)?;
+    USER_TASKS.save(deps.storage, (to_username.clone(), task_id), &true)?;
+    
+    Ok(Response::new()
+        .add_attribute("action", "create_task")
+        .add_attribute("task_id", task_id.to_string())
+        .add_attribute("payer", from_username)
+        .add_attribute("worker", to_username)
+        .add_attribute("amount", task.amount.to_string())
+        .add_event(
+            cosmwasm_std::Event::new("task_created")
+                .add_attribute("task_id", task_id.to_string())
+                .add_attribute("payer", task.payer.clone())
+                .add_attribute("worker", task.worker.clone())
+                .add_attribute("proof_type", format!("{:?}", task.proof_type))
+                .add_attribute("deadline", task.deadline_ts.to_string())
+        ))
+}
+
+pub fn execute_submit_soft_evidence(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    task_id: u64,
+    evidence_hash: String,
+) -> Result<Response, ContractError> {
+    let username = get_username_from_wallet(&deps, &info.sender)?;
+    
+    TASKS.update(deps.storage, task_id, |task| -> Result<_, ContractError> {
+        let mut task = task.ok_or(ContractError::TaskNotFound {})?;
+        
+        // Check authorization - only worker can submit evidence
+        if task.worker != username {
+            return Err(ContractError::TaskNotAuthorized {});
+        }
+        
+        // Check task type
+        if !matches!(task.proof_type, ProofType::Soft) {
+            return Err(ContractError::InvalidProofType {});
+        }
+        
+        // Check task status
+        if !matches!(task.status, TaskStatus::ProofSubmitted) {
+            return Err(ContractError::TaskAlreadyCompleted {});
+        }
+        
+        // Check deadline
+        if env.block.time.seconds() > task.deadline_ts {
+            return Err(ContractError::TaskExpired {});
+        }
+        
+        task.evidence_hash = Some(evidence_hash.clone());
+        task.updated_at = env.block.time.seconds();
+        
+        Ok(task)
+    })?;
+    
+    Ok(Response::new()
+        .add_attribute("action", "submit_soft_evidence")
+        .add_attribute("task_id", task_id.to_string())
+        .add_attribute("submitter", username)
+        .add_event(
+            cosmwasm_std::Event::new("proof_submitted")
+                .add_attribute("task_id", task_id.to_string())
+                .add_attribute("proof_type", "soft")
+                .add_attribute("evidence_hash", evidence_hash)
+        ))
+}
+
+pub fn execute_submit_zktls_proof(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    task_id: u64,
+    proof_blob_or_ref: String,
+    zk_proof_hash: String,
+) -> Result<Response, ContractError> {
+    let username = get_username_from_wallet(&deps, &info.sender)?;
+    
+    let task = TASKS.load(deps.storage, task_id)
+        .map_err(|_| ContractError::TaskNotFound {})?;
+    
+    // Check authorization - only worker can submit proof
+    if task.worker != username {
+        return Err(ContractError::TaskNotAuthorized {});
+    }
+    
+    // Check task type
+    if !matches!(task.proof_type, ProofType::ZkTLS | ProofType::Hybrid) {
+        return Err(ContractError::InvalidProofType {});
+    }
+    
+    // Check task status
+    if !matches!(task.status, TaskStatus::Escrowed) {
+        return Err(ContractError::TaskAlreadyCompleted {});
+    }
+    
+    // Check deadline
+    if env.block.time.seconds() > task.deadline_ts {
+        return Err(ContractError::TaskExpired {});
+    }
+    
+    // Verify zkTLS proof
+    let verification_result = verify_zktls(&proof_blob_or_ref, &task.endpoint)?;
+    if !verification_result {
+        return Err(ContractError::ZkTlsVerificationFailed {});
+    }
+    
+    // Update task based on proof type
+    TASKS.update(deps.storage, task_id, |task| -> Result<_, ContractError> {
+        let mut task = task.ok_or(ContractError::TaskNotFound {})?;
+        
+        task.zk_proof_hash = Some(zk_proof_hash.clone());
+        task.verified_at = Some(env.block.time.seconds());
+        task.updated_at = env.block.time.seconds();
+        
+        match task.proof_type {
+            ProofType::ZkTLS => {
+                // Instant release for zkTLS mode
+                task.status = TaskStatus::Released;
+            },
+            ProofType::Hybrid => {
+                // Move to pending release for hybrid mode
+                task.status = TaskStatus::PendingRelease;
+            },
+            _ => return Err(ContractError::InvalidProofType {}),
+        }
+        
+        Ok(task)
+    })?;
+    
+    let updated_task = TASKS.load(deps.storage, task_id)?;
+    let mut response = Response::new()
+        .add_attribute("action", "submit_zktls_proof")
+        .add_attribute("task_id", task_id.to_string())
+        .add_attribute("submitter", username)
+        .add_event(
+            cosmwasm_std::Event::new("proof_submitted")
+                .add_attribute("task_id", task_id.to_string())
+                .add_attribute("proof_type", format!("{:?}", updated_task.proof_type))
+                .add_attribute("zk_proof_hash", zk_proof_hash)
+        );
+    
+    // For zkTLS mode, immediately release payment
+    if matches!(updated_task.proof_type, ProofType::ZkTLS) {
+        let worker = USERS_BY_USERNAME.load(deps.storage, updated_task.worker.clone())?;
+        let payment_msg = CosmosMsg::Bank(BankMsg::Send {
+            to_address: worker.wallet_address.to_string(),
+            amount: vec![updated_task.amount],
+        });
+        response = response.add_message(payment_msg)
+            .add_event(
+                cosmwasm_std::Event::new("task_released")
+                    .add_attribute("task_id", task_id.to_string())
+                    .add_attribute("release_type", "instant")
+            );
+    } else {
+        // For hybrid mode, emit pending release event
+        response = response.add_event(
+            cosmwasm_std::Event::new("task_pending_release")
+                .add_attribute("task_id", task_id.to_string())
+                .add_attribute("review_window", updated_task.review_window_secs.unwrap_or(0).to_string())
+        );
+    }
+    
+    Ok(response)
+}
+
+pub fn execute_approve_task(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    task_id: u64,
+) -> Result<Response, ContractError> {
+    let username = get_username_from_wallet(&deps, &info.sender)?;
+    
+    let task = TASKS.load(deps.storage, task_id)
+        .map_err(|_| ContractError::TaskNotFound {})?;
+    
+    // Only payer can approve tasks
+    if task.payer != username {
+        return Err(ContractError::OnlyPayerCanApproveSoft {});
+    }
+    
+    // Check if task is in correct state for approval
+    if !matches!(task.status, TaskStatus::ProofSubmitted) {
+        return Err(ContractError::TaskAlreadyCompleted {});
+    }
+    
+    // Only soft tasks can be manually approved
+    if !matches!(task.proof_type, ProofType::Soft) {
+        return Err(ContractError::InvalidProofType {});
+    }
+    
+    // Update task status
+    TASKS.update(deps.storage, task_id, |task| -> Result<_, ContractError> {
+        let mut task = task.ok_or(ContractError::TaskNotFound {})?;
+        task.status = TaskStatus::Released;
+        task.updated_at = env.block.time.seconds();
+        Ok(task)
+    })?;
+    
+    // For soft tasks, payer sends funds when approving
+    let sent_amount = info.funds.iter()
+        .find(|coin| coin.denom == task.amount.denom)
+        .map(|coin| coin.amount)
+        .unwrap_or_default();
+    
+    if sent_amount < task.amount.amount {
+        return Err(ContractError::InsufficientFunds {});
+    }
+    
+    let worker = USERS_BY_USERNAME.load(deps.storage, task.worker.clone())?;
+    
+    let payment_msg = CosmosMsg::Bank(BankMsg::Send {
+        to_address: worker.wallet_address.to_string(),
+        amount: vec![task.amount],
+    });
+    
+    Ok(Response::new()
+        .add_message(payment_msg)
+        .add_attribute("action", "approve_task")
+        .add_attribute("task_id", task_id.to_string())
+        .add_attribute("approver", username)
+        .add_event(
+            cosmwasm_std::Event::new("task_released")
+                .add_attribute("task_id", task_id.to_string())
+                .add_attribute("release_type", "manual_approval")
+        ))
+}
+
+pub fn execute_dispute_task(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    task_id: u64,
+    reason_hash: Option<String>,
+) -> Result<Response, ContractError> {
+    let username = get_username_from_wallet(&deps, &info.sender)?;
+    
+    TASKS.update(deps.storage, task_id, |task| -> Result<_, ContractError> {
+        let mut task = task.ok_or(ContractError::TaskNotFound {})?;
+        
+        // Only payer can dispute
+        if task.payer != username {
+            return Err(ContractError::OnlyPayerCanDispute {});
+        }
+        
+        // Can only dispute hybrid tasks in pending release state
+        if !matches!(task.proof_type, ProofType::Hybrid) ||
+           !matches!(task.status, TaskStatus::PendingRelease) {
+            return Err(ContractError::TaskNotAuthorized {});
+        }
+        
+        // Check if dispute window is still open
+        if let (Some(verified_at), Some(review_window)) = (task.verified_at, task.review_window_secs) {
+            if env.block.time.seconds() > verified_at + review_window {
+                return Err(ContractError::DisputeWindowNotElapsed {});
+            }
+        }
+        
+        task.status = TaskStatus::Disputed;
+        task.updated_at = env.block.time.seconds();
+        
+        Ok(task)
+    })?;
+    
+    Ok(Response::new()
+        .add_attribute("action", "dispute_task")
+        .add_attribute("task_id", task_id.to_string())
+        .add_attribute("disputer", username)
+        .add_event(
+            cosmwasm_std::Event::new("task_disputed")
+                .add_attribute("task_id", task_id.to_string())
+                .add_attribute("reason_hash", reason_hash.unwrap_or_default())
+        ))
+}
+
+pub fn execute_resolve_dispute(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    task_id: u64,
+    decision: bool,
+) -> Result<Response, ContractError> {
+    let state = STATE.load(deps.storage)?;
+    
+    // Only contract owner can resolve disputes
+    if info.sender != state.owner {
+        return Err(ContractError::OnlyOwnerCanResolveDispute {});
+    }
+    
+    let task = TASKS.load(deps.storage, task_id)
+        .map_err(|_| ContractError::TaskNotFound {})?;
+    
+    // Check if task is in dispute
+    if !matches!(task.status, TaskStatus::Disputed) {
+        return Err(ContractError::TaskNotInDispute {});
+    }
+    
+    // Update task status
+    TASKS.update(deps.storage, task_id, |task| -> Result<_, ContractError> {
+        let mut task = task.ok_or(ContractError::TaskNotFound {})?;
+        task.status = if decision { TaskStatus::Released } else { TaskStatus::Refunded };
+        task.updated_at = env.block.time.seconds();
+        Ok(task)
+    })?;
+    
+    let mut response = Response::new()
+        .add_attribute("action", "resolve_dispute")
+        .add_attribute("task_id", task_id.to_string())
+        .add_attribute("decision", decision.to_string());
+    
+    if decision {
+        // Release to worker
+        let worker = USERS_BY_USERNAME.load(deps.storage, task.worker.clone())?;
+        let payment_msg = CosmosMsg::Bank(BankMsg::Send {
+            to_address: worker.wallet_address.to_string(),
+            amount: vec![task.amount],
+        });
+        response = response.add_message(payment_msg)
+            .add_event(
+                cosmwasm_std::Event::new("task_released")
+                    .add_attribute("task_id", task_id.to_string())
+                    .add_attribute("release_type", "dispute_resolved")
+            );
+    } else {
+        // Refund to payer
+        let payer = USERS_BY_USERNAME.load(deps.storage, task.payer.clone())?;
+        let refund_msg = CosmosMsg::Bank(BankMsg::Send {
+            to_address: payer.wallet_address.to_string(),
+            amount: vec![task.amount],
+        });
+        response = response.add_message(refund_msg)
+            .add_event(
+                cosmwasm_std::Event::new("task_refunded")
+                    .add_attribute("task_id", task_id.to_string())
+                    .add_attribute("refund_reason", "dispute_resolved")
+            );
+    }
+    
+    Ok(response)
+}
+
+pub fn execute_refund_if_expired(
+    deps: DepsMut,
+    env: Env,
+    _info: MessageInfo,
+    task_id: u64,
+) -> Result<Response, ContractError> {
+    let task = TASKS.load(deps.storage, task_id)
+        .map_err(|_| ContractError::TaskNotFound {})?;
+    
+    // Check if task has expired
+    if env.block.time.seconds() <= task.deadline_ts {
+        return Err(ContractError::TaskNotAuthorized {});
+    }
+    
+    // Can only refund tasks that are still escrowed or pending
+    if !matches!(task.status, TaskStatus::Escrowed | TaskStatus::ProofSubmitted | TaskStatus::PendingRelease) {
+        return Err(ContractError::TaskAlreadyCompleted {});
+    }
+    
+    // Update task status
+    TASKS.update(deps.storage, task_id, |task| -> Result<_, ContractError> {
+        let mut task = task.ok_or(ContractError::TaskNotFound {})?;
+        task.status = TaskStatus::Refunded;
+        task.updated_at = env.block.time.seconds();
+        Ok(task)
+    })?;
+    
+    let payer = USERS_BY_USERNAME.load(deps.storage, task.payer.clone())?;
+    
+    // Refund to payer (only for escrowed tasks)
+    let mut response = Response::new()
+        .add_attribute("action", "refund_expired_task")
+        .add_attribute("task_id", task_id.to_string())
+        .add_event(
+            cosmwasm_std::Event::new("task_refunded")
+                .add_attribute("task_id", task_id.to_string())
+                .add_attribute("refund_reason", "expired")
+        );
+    
+    // Only refund escrowed funds (soft tasks don't hold escrow)
+    if !matches!(task.proof_type, ProofType::Soft) {
+        let refund_msg = CosmosMsg::Bank(BankMsg::Send {
+            to_address: payer.wallet_address.to_string(),
+            amount: vec![task.amount],
+        });
+        response = response.add_message(refund_msg);
+    }
+    
+    Ok(response)
+}
+
+pub fn execute_release_if_window_elapsed(
+    deps: DepsMut,
+    env: Env,
+    _info: MessageInfo,
+    task_id: u64,
+) -> Result<Response, ContractError> {
+    let task = TASKS.load(deps.storage, task_id)
+        .map_err(|_| ContractError::TaskNotFound {})?;
+    
+    // Check if task is in pending release state
+    if !matches!(task.status, TaskStatus::PendingRelease) {
+        return Err(ContractError::TaskNotAuthorized {});
+    }
+    
+    // Check if dispute window has elapsed
+    if let (Some(verified_at), Some(review_window)) = (task.verified_at, task.review_window_secs) {
+        if env.block.time.seconds() <= verified_at + review_window {
+            return Err(ContractError::DisputeWindowNotElapsed {});
+        }
+    } else {
+        return Err(ContractError::TaskNotAuthorized {});
+    }
+    
+    // Update task status
+    TASKS.update(deps.storage, task_id, |task| -> Result<_, ContractError> {
+        let mut task = task.ok_or(ContractError::TaskNotFound {})?;
+        task.status = TaskStatus::Released;
+        task.updated_at = env.block.time.seconds();
+        Ok(task)
+    })?;
+    
+    let worker = USERS_BY_USERNAME.load(deps.storage, task.worker.clone())?;
+    
+    // Release payment to worker
+    let payment_msg = CosmosMsg::Bank(BankMsg::Send {
+        to_address: worker.wallet_address.to_string(),
+        amount: vec![task.amount],
+    });
+    
+    Ok(Response::new()
+        .add_message(payment_msg)
+        .add_attribute("action", "release_after_window")
+        .add_attribute("task_id", task_id.to_string())
+        .add_event(
+            cosmwasm_std::Event::new("task_released")
+                .add_attribute("task_id", task_id.to_string())
+                .add_attribute("release_type", "window_elapsed")
+        ))
+}
+
+// TASK SYSTEM QUERIES
+
+fn query_task_by_id(deps: Deps, task_id: u64) -> StdResult<Binary> {
+    let task = TASKS.load(deps.storage, task_id)?;
+    to_json_binary(&crate::msg::TaskResponse { task })
+}
+
+fn query_task_history(deps: Deps, username: String) -> StdResult<Binary> {
+    let mut tasks = Vec::new();
+    
+    // Get all tasks for this user
+    for item in USER_TASKS.prefix(username).range(deps.storage, None, None, Order::Ascending) {
+        let (task_id, _) = item?;
+        if let Ok(task) = TASKS.load(deps.storage, task_id) {
+            tasks.push(task);
+        }
+    }
+    
+    to_json_binary(&crate::msg::TasksResponse { tasks })
+}
+
+fn query_pending_tasks(deps: Deps, username: String) -> StdResult<Binary> {
+    let mut tasks = Vec::new();
+    
+    // Get all tasks for this user that are pending
+    for item in USER_TASKS.prefix(username).range(deps.storage, None, None, Order::Ascending) {
+        let (task_id, _) = item?;
+        if let Ok(task) = TASKS.load(deps.storage, task_id) {
+            if matches!(task.status, TaskStatus::Escrowed | TaskStatus::ProofSubmitted | TaskStatus::PendingRelease) {
+                tasks.push(task);
+            }
+        }
+    }
+    
+    to_json_binary(&crate::msg::TasksResponse { tasks })
 }

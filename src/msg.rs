@@ -1,6 +1,6 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use crate::state::{User, FriendRequest, Payment, ProofType};
+use crate::state::{User, FriendRequest, Payment, ProofType, Task};
 use cosmwasm_std::Coin;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -47,11 +47,41 @@ pub enum ExecuteMsg {
         description: String, 
         proof_type: ProofType 
     },
-    CreateHelpRequest { 
-        to_username: String, 
+    // Task System
+    CreateTask {
+        to_username: String,
         amount: Coin,
-        description: String, 
-        proof_type: ProofType 
+        description: String,
+        proof_type: ProofType,
+        deadline_ts: u64,
+        review_window_secs: Option<u64>,
+        endpoint: String,
+    },
+    SubmitSoftEvidence {
+        task_id: u64,
+        evidence_hash: String,
+    },
+    SubmitZkTlsProof {
+        task_id: u64,
+        proof_blob_or_ref: String,
+        zk_proof_hash: String,
+    },
+    ApproveTask {
+        task_id: u64,
+    },
+    DisputeTask {
+        task_id: u64,
+        reason_hash: Option<String>,
+    },
+    ResolveDispute {
+        task_id: u64,
+        decision: bool, // true = release to worker, false = refund to payer
+    },
+    RefundIfExpired {
+        task_id: u64,
+    },
+    ReleaseIfWindowElapsed {
+        task_id: u64,
     },
     SubmitProof { 
         payment_id: u64, 
@@ -118,6 +148,17 @@ pub enum QueryMsg {
     GetPendingPayments { 
         username: String 
     },
+    
+    // Task System
+    GetTaskById {
+        task_id: u64,
+    },
+    GetTaskHistory {
+        username: String,
+    },
+    GetPendingTasks {
+        username: String,
+    },
 }
 
 // Response Types
@@ -174,4 +215,14 @@ pub struct PaymentResponse {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct PaymentsResponse {
     pub payments: Vec<Payment>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct TaskResponse {
+    pub task: Task,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct TasksResponse {
+    pub tasks: Vec<Task>,
 }

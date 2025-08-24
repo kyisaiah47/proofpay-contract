@@ -1,9 +1,9 @@
 use cosmwasm_schema::{export_schema, remove_schemas, schema_for};
-use proof_of_work_contract::msg::{
+use proofpay_contract::msg::{
     ExecuteMsg, InstantiateMsg, QueryMsg, UserResponse, UsersResponse, PaymentResponse, PaymentsResponse,
-    UsernameResponse, WalletResponse, HasUsernameResponse, UsernameAvailableResponse
+    UsernameResponse, WalletResponse, HasUsernameResponse, UsernameAvailableResponse, TaskResponse, TasksResponse
 };
-use proof_of_work_contract::state::{User, Payment, PaymentStatus, ProofType, State};
+use proofpay_contract::state::{User, Payment, PaymentStatus, ProofType, State, Task, TaskStatus};
 use std::env::current_dir;
 use std::fs::create_dir_all;
 
@@ -29,4 +29,8 @@ fn main() {
     export_schema(&schema_for!(PaymentStatus), &out_dir);
     export_schema(&schema_for!(ProofType), &out_dir);
     export_schema(&schema_for!(State), &out_dir);
+    export_schema(&schema_for!(TaskResponse), &out_dir);
+    export_schema(&schema_for!(TasksResponse), &out_dir);
+    export_schema(&schema_for!(Task), &out_dir);
+    export_schema(&schema_for!(TaskStatus), &out_dir);
 }

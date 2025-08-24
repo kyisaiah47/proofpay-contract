@@ -84,4 +84,47 @@ pub enum ContractError {
     
     #[error("Only payment recipient can approve")]
     OnlyRecipientCanApprove {},
+    
+    // Task System Errors
+    #[error("Task not found")]
+    TaskNotFound {},
+    
+    #[error("Not authorized to access this task")]
+    TaskNotAuthorized {},
+    
+    #[error("Task already completed")]
+    TaskAlreadyCompleted {},
+    
+    #[error("Task already disputed")]
+    TaskAlreadyDisputed {},
+    
+    #[error("Task deadline expired")]
+    TaskExpired {},
+    
+    #[error("Task not in dispute")]
+    TaskNotInDispute {},
+    
+    #[error("Dispute window has not elapsed")]
+    DisputeWindowNotElapsed {},
+    
+    #[error("Invalid proof")]
+    InvalidProof {},
+    
+    #[error("zkTLS verification failed")]
+    ZkTlsVerificationFailed {},
+    
+    #[error("Only payer can approve soft tasks")]
+    OnlyPayerCanApproveSoft {},
+    
+    #[error("Only payer can dispute tasks")]
+    OnlyPayerCanDispute {},
+    
+    #[error("Only owner can resolve disputes")]
+    OnlyOwnerCanResolveDispute {},
+    
+    #[error("Cannot create task with yourself")]
+    CannotCreateTaskWithSelf {},
+    
+    #[error("Invalid task deadline")]
+    InvalidTaskDeadline {},
 }

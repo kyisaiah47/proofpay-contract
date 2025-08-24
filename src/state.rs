@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 pub struct State {
     pub owner: Addr,
     pub next_payment_id: u64,
+    pub next_task_id: u64,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -61,7 +62,6 @@ pub struct Payment {
 pub enum PaymentType {
     DirectPayment,    // Immediate payment
     PaymentRequest,   // Request money owed
-    HelpRequest,      // Request help/work
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -81,6 +81,38 @@ pub enum ProofType {
     Location,         // Location proof
     ZkTLS,           // zkTLS verification
     Manual,          // Manual verification
+    Soft,            // Task: no escrow, payer approves manually
+    Hybrid,          // Task: escrowed, zkTLS proof + dispute window
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub enum TaskStatus {
+    Escrowed,         // Funds held in escrow
+    ProofSubmitted,   // Proof submitted, waiting for processing
+    PendingRelease,   // Hybrid mode: waiting for dispute window to expire
+    Released,         // Task completed, payment sent
+    Disputed,         // Task under dispute
+    Refunded,         // Task expired/cancelled, funds returned
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct Task {
+    pub id: u64,
+    pub payer: String,           // username
+    pub worker: String,          // username
+    pub amount: cosmwasm_std::Coin,
+    pub proof_type: ProofType,
+    pub status: TaskStatus,
+    pub deadline_ts: u64,        // Unix timestamp when task expires
+    pub review_window_secs: Option<u64>, // For hybrid mode dispute window
+    pub endpoint: String,        // API endpoint for zkTLS verification
+    pub evidence_hash: Option<String>,   // Hash of evidence for soft mode
+    pub zk_proof_hash: Option<String>,   // Hash of zkTLS proof
+    pub verified_at: Option<u64>,        // When proof was verified
+    pub verifier_id: Option<String>,     // ID of verifier (if any)
+    pub description: String,
+    pub created_at: u64,
+    pub updated_at: u64,
 }
 
 // Storage Maps
@@ -97,3 +129,7 @@ pub const FRIEND_REQUESTS: Map<(String, String), FriendRequest> = Map::new("frie
 // Payment System
 pub const PAYMENTS: Map<u64, Payment> = Map::new("payments");
 pub const USER_PAYMENTS: Map<(String, u64), bool> = Map::new("user_payments"); // (username, payment_id) -> exists
+
+// Task System
+pub const TASKS: Map<u64, Task> = Map::new("tasks");
+pub const USER_TASKS: Map<(String, u64), bool> = Map::new("user_tasks"); // (username, task_id) -> exists
