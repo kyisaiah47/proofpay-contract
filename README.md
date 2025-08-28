@@ -1,149 +1,293 @@
-# XION Social Payment Smart Contract
+# ProofPay Multi-Chain Smart Contracts
 
-A CosmWasm smart contract for the XION blockchain, providing a comprehensive social payment platform with user management, friends system, and multi-type payment processing. Includes robust username registration, wallet mapping, and proof verification (including zkTLS support).
+ProofPay's multi-chain smart contract system supporting both EVM (Ethereum, Polygon, BSC, Arbitrum) and Cosmos (XION, Osmosis, Neutron, Juno) ecosystems with cross-chain payment capabilities.
 
----
+## 🏗️ Architecture Overview
 
-## ✨ Features
-
-- **User Management**
-
-  - Register unique usernames (case-insensitive, 3-50 chars, alphanumeric + underscores)
-  - Map wallet addresses to usernames and vice versa
-  - Update user profiles (display name, profile picture)
-  - Search users by username or display name
-
-- **Friends System**
-
-  - Send, accept, and decline friend requests
-  - Remove friends
-  - Query friends list and pending requests
-
-- **Payment System**
-
-  - Direct payments between friends
-  - Payment requests and help/crowdfunding requests
-  - Escrow system for secure payments
-  - Proof submission and verification (Photo, Document, Location, zkTLS, Manual)
-  - Payment approval, rejection, and cancellation
-
-- **Events & Queries**
-
-  - Emits events for key actions (e.g., `username_registered`)
-  - Query endpoints for all user, friend, and payment data
-
-- **Security & Validation**
-  - Strict username validation and uniqueness
-  - Case-insensitive lookups
-  - Comprehensive error handling
-
----
-
-## 🛠️ Tech Stack
-
-- **CosmWasm** (for smart contracts on Cosmos chains)
-- **Rust** (safe, performant contract logic)
-- **WASM** (compiled output)
-
----
-
-## 📦 Usage
-
-### Build
-
-```sh
-cargo wasm
+```
+packages/
+├── contracts-evm/          # Solidity contracts for EVM chains
+│   ├── contracts/
+│   │   ├── ProofPay.sol           # Main contract
+│   │   ├── ProofPayUsers.sol      # User management
+│   │   ├── ProofPayments.sol      # Payment processing
+│   │   └── ProofPayCCIP.sol       # Cross-chain integration
+│   ├── deploy/
+│   ├── test/
+│   └── hardhat.config.ts
+├── contracts-cosmwasm/     # CosmWasm contracts for Cosmos chains
+│   ├── src/
+│   │   ├── contract.rs            # Main contract logic
+│   │   ├── msg.rs                 # Message definitions
+│   │   ├── state.rs               # State management
+│   │   └── ibc.rs                 # IBC integration
+│   └── Cargo.toml
+└── shared/                 # Common types and constants
+    ├── types.ts
+    ├── constants.ts
+    └── index.ts
 ```
 
-### Test
+## 🚀 Quick Start
 
-```sh
+### Prerequisites
+
+- Node.js (>=18.0.0)
+- Rust and Cargo
+- Docker (for CosmWasm optimization)
+
+### Installation
+
+```bash
+# Clone the repository
+git clone https://github.com/your-org/proofpay-contract
+cd proofpay-contract
+
+# Install all dependencies
+npm run install:all
+```
+
+### Environment Setup
+
+```bash
+# Copy environment template
+cp .env.example .env
+
+# Edit .env with your configuration
+# - Private keys
+# - RPC URLs
+# - API keys for verification
+```
+
+### Build All Contracts
+
+```bash
+# Build EVM and CosmWasm contracts
+npm run build:all
+```
+
+### Deploy to All Chains
+
+```bash
+# Deploy to all supported chains
+npm run deploy:all
+```
+
+## 🔗 Supported Chains
+
+### EVM Chains (with Chainlink CCIP)
+- **Ethereum Mainnet/Sepolia**
+- **Polygon** 
+- **BNB Smart Chain**
+- **Arbitrum One**
+
+### Cosmos Chains (with IBC)
+- **XION** - Primary testnet chain
+- **Osmosis** - DEX and liquidity hub
+- **Neutron** - Smart contracts platform
+- **Juno** - Interoperable smart contracts
+
+## 🛠️ Core Features
+
+### User Management
+- Decentralized user registration with usernames
+- Multi-address authorization system
+- Cross-chain identity consistency
+
+### Payment Processing
+- Native and token payments
+- Proof-based verification system
+- Multi-step payment flows
+- Dispute resolution
+
+### Cross-Chain Integration
+- **CCIP (EVM)**: Seamless cross-chain payments between EVM chains
+- **IBC (Cosmos)**: Inter-blockchain communication for Cosmos ecosystem
+- Unified payment experience across all chains
+
+### Proof Systems
+- Text-based proofs
+- Photo verification
+- zkTLS integration
+- Hybrid proof combinations
+
+## 📋 Available Scripts
+
+### Development
+```bash
+npm run build:all          # Build all contracts
+npm run test:all           # Run all tests
+npm run clean              # Clean build artifacts
+```
+
+### Deployment
+```bash
+npm run deploy:all         # Deploy to all chains
+npm run deploy:evm:sepolia # Deploy to specific EVM chain
+npm run verify:all         # Verify contracts on explorers
+```
+
+### Chain-Specific
+```bash
+# EVM chains
+npm run deploy:evm:polygon
+npm run deploy:evm:bsc
+npm run deploy:evm:arbitrum
+
+# CosmWasm chains require chain-specific tools
+# See deployment documentation
+```
+
+## 🔧 Configuration
+
+### Chain Configuration
+
+Chain configurations are defined in `packages/shared/constants.ts`:
+
+```typescript
+export const SUPPORTED_EVM_CHAINS = {
+  ETHEREUM: {
+    chainId: 1,
+    ccipChainSelector: '5009297550715157269',
+    // ...
+  },
+  // ...
+};
+
+export const SUPPORTED_COSMOS_CHAINS = {
+  XION: {
+    chainId: 'xion-testnet-1',
+    addressPrefix: 'xion',
+    // ...
+  },
+  // ...
+};
+```
+
+### Contract Addresses
+
+After deployment, contract addresses are automatically updated in:
+- `packages/contracts-evm/deployments/`
+- `deployment-summary.json`
+
+## 🧪 Testing
+
+### EVM Contracts
+```bash
+cd packages/contracts-evm
+npm test
+```
+
+### CosmWasm Contracts
+```bash
+cd packages/contracts-cosmwasm
 cargo test
 ```
 
-### Generate JSON Schemas
+## 📝 Contract Interaction Examples
 
-```sh
-cargo run --example schema
+### Register User
+```solidity
+// Solidity
+proofPay.registerUser("alice");
 ```
 
-### Directory Structure
-
-```
-src/
-  contract.rs        # Main contract logic
-  state.rs           # Data structures and storage maps
-  msg.rs             # API message and response types
-  error.rs           # Error definitions
-  helpers.rs         # Utility functions
-  integration_tests.rs # Comprehensive test suite
-artifacts/
-  cw_counter.wasm    # Compiled WASM binary
-schema/
-  *.json             # Generated JSON schemas for API
+```rust
+// CosmWasm
+ExecuteMsg::RegisterUser { username: "alice".to_string() }
 ```
 
----
+### Create Payment
+```solidity
+// Solidity
+PaymentParams memory params = PaymentParams({
+    recipient: recipientAddress,
+    amount: 1000000, // 1 USDC (6 decimals)
+    token: usdcAddress,
+    proofType: ProofType.Text,
+    description: "Payment for services",
+    requiresProof: true
+});
+proofPay.createPayment{value: 0}(params);
+```
 
-## API Overview
+### Cross-Chain Payment (CCIP)
+```solidity
+CrossChainPayment memory payment = CrossChainPayment({
+    destinationChain: 4051577828743386545, // Polygon
+    recipient: recipientAddress,
+    amount: 1000000,
+    token: usdcAddress,
+    zkProof: proofData,
+    description: "Cross-chain payment"
+});
+proofPayCCIP.sendCrossChainPayment{value: msg.value}(payment);
+```
 
-### Execute Messages
+## 🛡️ Security Features
 
-- `RegisterUser { username, display_name }` — Register a new user with a unique username
-- `UpdateUserProfile { display_name, profile_picture }` — Update your display name or profile picture
-- `SendFriendRequest { to_username }` — Send a friend request to another user
-- `AcceptFriendRequest { from_username }` — Accept a pending friend request
-- `DeclineFriendRequest { from_username }` — Decline a pending friend request
-- `RemoveFriend { username }` — Remove a user from your friends list
-- `SendDirectPayment { to_username, amount, description, proof_type }` — Send a direct payment to a friend
-- `CreatePaymentRequest { to_username, amount, description, proof_type }` — Request a payment from another user
-- `CreateHelpRequest { to_username, amount, description, proof_type }` — Create a help/crowdfunding request
-- `SubmitProof { payment_id, proof_data }` — Submit proof for a payment or help request
-- `ApprovePayment { payment_id }` — Approve a payment after proof submission
-- `RejectPayment { payment_id }` — Reject a payment after proof submission
-- `CancelPayment { payment_id }` — Cancel a pending payment
+- **Reentrancy Protection**: All external calls protected
+- **Access Control**: Role-based permissions
+- **Input Validation**: Comprehensive parameter validation
+- **Cross-Chain Security**: Source validation for CCIP/IBC
+- **Rate Limiting**: Per-user and global limits
+- **Emergency Controls**: Circuit breakers implemented
 
-### Query Messages
+## 📊 Gas Optimization
 
-- `GetUserByUsername { username }` — Get user profile by username
-- `GetUserByWallet { wallet_address }` — Get user profile by wallet address
-- `IsUsernameAvailable { username }` — Check if a username is available
-- `SearchUsers { query }` — Search users by username or display name
-- `GetUsernameByWallet { wallet_address }` — Get username for a wallet address
-- `GetWalletByUsername { username }` — Get wallet address for a username
-- `HasUsername { wallet_address }` — Check if a wallet has a registered username
-- `GetUserFriends { username }` — Get a user's friends list
-- `GetPendingRequests { username }` — Get pending friend requests for a user
-- `AreFriends { username1, username2 }` — Check if two users are friends
-- `GetPaymentById { payment_id }` — Get payment details by ID
-- `GetPaymentHistory { username }` — Get payment history for a user
-- `GetPendingPayments { username }` — Get pending payments for a user
+### Optimized Storage Patterns
+```solidity
+struct PackedPayment {
+    address sender;      // 20 bytes
+    address recipient;   // 20 bytes  
+    uint96 amount;      // 12 bytes (packed)
+    uint32 createdAt;   // 4 bytes
+    PaymentStatus status; // 1 byte
+    ProofType proofType; // 1 byte
+}
+```
 
-### Events
+### Gas Limits
+- User Registration: ~100k gas
+- Payment Creation: ~200k gas
+- Cross-chain Send: ~500k gas
 
-- `username_registered` — Emitted when a user successfully registers a username. Attributes: `wallet`, `username`
-- `register_user` — Emitted on user registration. Attributes: `username`, `wallet`
-- `update_user_profile` — Emitted when a user updates their profile. Attributes: `username`
-- `send_friend_request` — Emitted when a friend request is sent. Attributes: `from_username`, `to_username`
-- `accept_friend_request` — Emitted when a friend request is accepted. Attributes: `from`, `to`
-- `decline_friend_request` — Emitted when a friend request is declined. Attributes: `from`, `to`
-- `remove_friend` — Emitted when a friend is removed. Attributes: `user`, `removed_friend`
-- `send_direct_payment` — Emitted when a direct payment is sent. Attributes: `from`, `to`, `payment_id`, `amount`
-- `create_payment_request` — Emitted when a payment request is created. Attributes: `from`, `to`, `payment_id`, `amount`
-- `create_help_request` — Emitted when a help/crowdfunding request is created. Attributes: `from`, `to`, `payment_id`, `amount`
-- `submit_proof` — Emitted when proof is submitted for a payment. Attributes: `payment_id`, `submitter`
-- `approve_payment` — Emitted when a payment is approved. Attributes: `payment_id`, `approver`
-- `reject_payment` — Emitted when a payment is rejected. Attributes: `payment_id`, `rejector`
-- `cancel_payment` — Emitted when a payment is cancelled. Attributes: `payment_id`, `canceller`
+## 🔗 Cross-Chain Cost Estimates
 
----
+| Route | Estimated Fee | Speed | Security |
+|-------|--------------|--------|----------|
+| Ethereum → Polygon | $5-15 | 5-10 min | High |
+| Polygon → BSC | $3-8 | 3-7 min | High |
+| XION → Osmosis | $0.1-0.5 | 1-3 min | High |
+| Osmosis → Neutron | $0.05-0.2 | 30s-2min | High |
+
+## 🚨 Emergency Procedures
+
+### Circuit Breakers
+All contracts include emergency pause functionality for critical issues.
+
+### Upgrade Patterns
+Contracts use proxy patterns for safe upgrades (where applicable).
 
 ## 📄 License
 
-MIT
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+## 📞 Support
+
+For support and questions:
+- Create an issue in this repository
+- Join our Discord community
+- Email: support@proofpay.com
 
 ---
 
-## 🙋‍♂️ Contact
-
-Questions or ideas? Open an issue or reach out on [GitHub](https://github.com/kyisaiah47).
+**Ready to build the future of verified payments across all blockchains!** 🚀

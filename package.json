@@ -1,0 +1,68 @@
+{
+  "name": "proofpay-multichain",
+  "version": "1.0.0",
+  "description": "ProofPay multi-chain smart contracts with cross-chain payment capabilities",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "install:all": "npm install && npm run install:evm && npm run install:cosmwasm && npm run install:shared",
+    "install:evm": "cd packages/contracts-evm && npm install",
+    "install:cosmwasm": "cd packages/contracts-cosmwasm && cargo build",
+    "install:shared": "cd packages/shared && npm install",
+    
+    "build:all": "npm run build:evm && npm run build:cosmwasm && npm run build:shared",
+    "build:evm": "cd packages/contracts-evm && npm run compile",
+    "build:cosmwasm": "cd packages/contracts-cosmwasm && cargo build --release --target wasm32-unknown-unknown",
+    "build:shared": "cd packages/shared && npm run build",
+    
+    "test:all": "npm run test:evm && npm run test:cosmwasm",
+    "test:evm": "cd packages/contracts-evm && npm run test",
+    "test:cosmwasm": "cd packages/contracts-cosmwasm && cargo test",
+    
+    "deploy:all": "./scripts/deploy-all-chains.sh",
+    "deploy:evm:sepolia": "cd packages/contracts-evm && npm run deploy:sepolia",
+    "deploy:evm:polygon": "cd packages/contracts-evm && npm run deploy:polygon",
+    "deploy:evm:bsc": "cd packages/contracts-evm && npm run deploy:bsc",
+    "deploy:evm:arbitrum": "cd packages/contracts-evm && npm run deploy:arbitrum",
+    
+    "verify:all": "npm run verify:evm",
+    "verify:evm": "cd packages/contracts-evm && npm run verify",
+    
+    "clean": "npm run clean:evm && npm run clean:cosmwasm && npm run clean:shared",
+    "clean:evm": "cd packages/contracts-evm && rm -rf artifacts cache",
+    "clean:cosmwasm": "cd packages/contracts-cosmwasm && cargo clean",
+    "clean:shared": "cd packages/shared && rm -rf dist",
+    
+    "lint": "npm run lint:evm",
+    "lint:evm": "cd packages/contracts-evm && npm run lint",
+    "format": "npm run format:cosmwasm",
+    "format:cosmwasm": "cd packages/contracts-cosmwasm && cargo fmt"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-org/proofpay-contract"
+  },
+  "keywords": [
+    "proofpay",
+    "multi-chain",
+    "cross-chain",
+    "payments",
+    "solidity",
+    "cosmwasm",
+    "ccip",
+    "ibc",
+    "blockchain"
+  ],
+  "author": "ProofPay Team",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  }
+}

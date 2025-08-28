@@ -1,0 +1,25 @@
+{
+  "name": "@proofpay/contracts-evm",
+  "version": "1.0.0",
+  "description": "ProofPay EVM smart contracts for multi-chain payments with proof verification",
+  "scripts": {
+    "compile": "npx hardhat compile",
+    "test": "npx hardhat test",
+    "deploy:localhost": "npx hardhat deploy --network localhost",
+    "deploy:sepolia": "npx hardhat deploy --network sepolia", 
+    "deploy:polygon": "npx hardhat deploy --network polygon",
+    "deploy:bsc": "npx hardhat deploy --network bsc",
+    "deploy:arbitrum": "npx hardhat deploy --network arbitrum",
+    "verify": "npx hardhat verify --network"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^5.0.0",
+    "@chainlink/contracts": "^0.8.0"
+  },
+  "devDependencies": {
+    "hardhat": "^2.19.0",
+    "@nomicfoundation/hardhat-toolbox": "^4.0.0",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  }
+}

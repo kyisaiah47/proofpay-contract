@@ -1,0 +1,28 @@
+[package]
+name = "proofpay-cosmwasm"
+version = "1.0.0"
+authors = ["ProofPay Team"]
+edition = "2021"
+description = "ProofPay CosmWasm smart contracts for multi-chain payments with proof verification"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = ["contract"]
+contract = []
+library = []
+
+[dependencies]
+cosmwasm-std = { version = "1.5.0", features = ["ibc3"] }
+cosmwasm-storage = "1.5.0"
+cw-storage-plus = "1.2.0"
+cw2 = "1.1.0"
+cw-utils = "1.0.3"
+schemars = "0.8.16"
+serde = { version = "1.0.195", default-features = false, features = ["derive"] }
+thiserror = { version = "1.0.56" }
+
+[dev-dependencies]
+cosmwasm-vm = "1.5.0"
+cw-multi-test = "0.20.0"
